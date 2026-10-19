@@ -36,4 +36,4 @@ Providers.Windows holds providers/tools built on WinRT APIs (e.g. Windows.Data.P
 
 ## Current milestone
 See docs/design.md, Implementation plan. Work on one milestone at a time.
-Status: M5 done in code (hook supervisor/watchdog, job object, temp journal, log rotation, idle trim, DPI, high contrast; ADR 0007); manual M5 checks pending. Next: M6 packaging, signing, release.
+Status: M5 done in code; Segments overlay style added. Distribution is GitHub Releases only, no Store (ADR 0008). Next: M6 packaging (self-contained build, GitHub release, SignPath, winget).

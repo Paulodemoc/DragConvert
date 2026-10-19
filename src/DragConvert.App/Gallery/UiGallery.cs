@@ -119,15 +119,18 @@ internal static class UiGallery
             }
         }
 
-        // Glass over a bright and a dark stand-in wallpaper, blurred by the same code the app uses on the real screen.
-        foreach (ThemeVariant variant in new[] { ThemeVariant.Light, ThemeVariant.Dark })
+        // Glass and segments over a bright and a dark stand-in wallpaper, blurred like the real screen.
+        foreach (var (style, prefix) in new[] { (OverlayRenderer.Glass, "glass"), (OverlayRenderer.Segments, "segments") })
         {
-            foreach (var (name, setup) in States)
+            foreach (ThemeVariant variant in new[] { ThemeVariant.Light, ThemeVariant.Dark })
             {
-                FrameworkElement frame = Frame(variant, setup, glass: true);
-                string path = Path.Combine(directory, $"glass-{variant.ToString().ToLowerInvariant()}-{name}.png");
-                File.WriteAllBytes(path, AppIcon.EncodePng(RenderElement(frame, scale: 2)));
-                written.Add(path);
+                foreach (var (name, setup) in States)
+                {
+                    FrameworkElement frame = Frame(variant, setup, style);
+                    string path = Path.Combine(directory, $"{prefix}-{variant.ToString().ToLowerInvariant()}-{name}.png");
+                    File.WriteAllBytes(path, AppIcon.EncodePng(RenderElement(frame, scale: 2)));
+                    written.Add(path);
+                }
             }
         }
 
@@ -149,11 +152,11 @@ internal static class UiGallery
         var panel = new WrapPanel { Margin = new Thickness(12) };
         foreach (var (name, setup) in States)
         {
-            foreach (var (label, variant, glass) in new[] { ("glass", ThemeVariant.Dark, true), ("ring, light", ThemeVariant.Light, false), ("ring, dark", ThemeVariant.Dark, false) })
+            foreach (var (label, variant, style) in new[] { ("glass", ThemeVariant.Dark, OverlayRenderer.Glass), ("segments", ThemeVariant.Light, OverlayRenderer.Segments), ("ring, dark", ThemeVariant.Dark, OverlayRenderer.Layered) })
             {
                 var stack = new StackPanel { Margin = new Thickness(6) };
                 stack.Children.Add(new TextBlock { Text = $"{name} ({label})", Margin = new Thickness(0, 0, 0, 4) });
-                stack.Children.Add(Frame(variant, setup, glass));
+                stack.Children.Add(Frame(variant, setup, style));
                 panel.Children.Add(stack);
             }
         }
@@ -198,11 +201,16 @@ internal static class UiGallery
     private static OverlayTile T(string label, MediaCategory category, string? detail = null) => new(label, detail, category);
 
     /// <summary>The overlay on a stand-in desktop background for its theme.</summary>
-    private static Border Frame(ThemeVariant variant, Action<OverlayView> setup, bool glass = false)
+    private static Border Frame(ThemeVariant variant, Action<OverlayView> setup, OverlayRenderer style = OverlayRenderer.Layered)
     {
-        OverlayView view = glass ? new GlassOverlayView() : new RingOverlayView(OverlayTheme.For(variant));
+        OverlayView view = style switch
+        {
+            OverlayRenderer.Glass => new GlassOverlayView(),
+            OverlayRenderer.Segments => new SegmentsOverlayView(),
+            _ => new RingOverlayView(OverlayTheme.For(variant)),
+        };
         setup(view);
-        Brush desktop = Wallpaper(variant, glass);
+        Brush desktop = Wallpaper(variant, busy: style != OverlayRenderer.Layered);
         if (view.WantsBackdrop)
         {
             // What the real overlay would capture: the wallpaper under the view, blurred.

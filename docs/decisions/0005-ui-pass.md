@@ -70,3 +70,15 @@ Status: accepted, pending the owner's review of the look
 - **Style changes apply immediately**: the controller closes the overlay window and builds and warms up a new one.
 - The owner's report of "glass still shows a rectangle" came from an outdated Debug build (only Release had been
   rebuilt). Both configurations are now rebuilt after changes.
+
+## Addendum 3: Segments style
+
+- **New "Segments" style**, modelled on the owner's reference: one ring slice per option sharing the full circle
+  (two options give half-rings, eight give eighths), constant-width gaps (so the angular gap is wider at the inner
+  edge) and rounded corners, made by insetting each segment by the corner radius and stroking it with round joins in
+  the fill colour. Element opacity (not brush alpha) keeps fill and stroke as one layer, so there's no darker seam.
+- Labels sit at mid-radius, upper case, sized to the slice's chord; multi-word tool names wrap. The hovered slice
+  turns orange (`Segments.Hover`), glows and moves outward a few pixels; the centre circle names it. The count badge
+  sits inside the centre circle.
+- It uses the same frosted backdrop and brightness-aware darkening as Glass. Hit testing is by angle, as for the
+  other styles.

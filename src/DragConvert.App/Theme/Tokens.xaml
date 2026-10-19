@@ -56,6 +56,19 @@
     <sys:Double x:Key="Glass.ScrimNoBackdrop">0.6</sys:Double>
     <Color x:Key="Glass.HoverIcon">#FF1A1A1A</Color>
 
+    <!-- Segments style: one ring slice per option over the frosted backdrop -->
+    <sys:Double x:Key="Segments.OuterRadius">128</sys:Double>
+    <sys:Double x:Key="Segments.InnerRadius">56</sys:Double>
+    <sys:Double x:Key="Segments.RimPadding">8</sys:Double>
+    <sys:Double x:Key="Segments.Gap">6</sys:Double>
+    <sys:Double x:Key="Segments.Corner">7</sys:Double>
+    <sys:Double x:Key="Segments.HoverPush">5</sys:Double>
+    <sys:Double x:Key="Segments.SliceAlpha">0.72</sys:Double>
+    <sys:Double x:Key="Segments.BaseFrost">0.18</sys:Double>
+    <sys:Double x:Key="Segments.CenterAlpha">0.92</sys:Double>
+    <Color x:Key="Segments.Hover">#FFFF5A1F</Color>
+    <Color x:Key="Segments.Text">#FF1F1F1F</Color>
+
     <!-- Dark theme -->
     <Color x:Key="Dark.Plate">#D91C1C1C</Color>
     <Color x:Key="Dark.PlateBorder">#33FFFFFF</Color>

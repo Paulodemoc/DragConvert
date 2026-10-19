@@ -20,6 +20,9 @@ public enum OverlayRenderer
 
     /// <summary>"Glass": a clear frosted disc (blurred copy of what's behind it) with round bubbles.</summary>
     Glass,
+
+    /// <summary>"Segments": a ring split into one slice per option, on the frosted backdrop.</summary>
+    Segments,
 }
 
 /// <summary>What the drag carries, read once when it first enters the overlay.</summary>
@@ -49,7 +52,12 @@ internal sealed class OverlayWindow : Window
     {
         _renderer = renderer;
         _theme = OverlayTheme.Current();
-        View = renderer == OverlayRenderer.Glass ? new GlassOverlayView() : new RingOverlayView(_theme);
+        View = renderer switch
+        {
+            OverlayRenderer.Glass => new GlassOverlayView(),
+            OverlayRenderer.Segments => new SegmentsOverlayView(),
+            _ => new RingOverlayView(_theme),
+        };
 
         Width = View.Width;
         Height = View.Height;
