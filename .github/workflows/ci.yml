@@ -20,6 +20,10 @@ jobs:
         with:
           global-json-file: global.json
 
+      - name: Fetch FFmpeg (LGPL) for provider tests
+        shell: pwsh
+        run: ./tools/fetch-ffmpeg.ps1
+
       - name: Restore
         run: dotnet restore DragConvert.slnx
 

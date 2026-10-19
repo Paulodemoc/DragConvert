@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/DragConvert.App/DragConvert.App.csproj" />
+    <Project Path="src/DragConvert.Cli/DragConvert.Cli.csproj" />
     <Project Path="src/DragConvert.Core/DragConvert.Core.csproj" />
     <Project Path="src/DragConvert.Native/DragConvert.Native.csproj" />
     <Project Path="src/DragConvert.Providers/DragConvert.Providers.csproj" />

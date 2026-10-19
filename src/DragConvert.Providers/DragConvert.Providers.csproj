@@ -6,6 +6,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Magick.NET-Q8-AnyCPU" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\DragConvert.Core\DragConvert.Core.csproj" />
   </ItemGroup>
 

@@ -8,4 +8,8 @@
     <ProjectReference Include="..\..\src\DragConvert.Providers\DragConvert.Providers.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="Fixtures\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

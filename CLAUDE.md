@@ -13,15 +13,19 @@ C# 14, .NET 10, WPF (Fluent theme), CsWin32. Solution in src/, tests in tests/.
 - Never modify the source file. Write output to a temp file and rename atomically.
 - No network calls and no telemetry.
 - Record non-obvious decisions as short ADRs in docs/decisions/.
+- Licensing: no GPL/AGPL components. FFmpeg must be an LGPL build (MP4 uses h264_mf, not x264). HEIC is input-only.
+- Apps launched from an elevated shell are elevated, and Windows then blocks drops from Explorer: launch GUI test builds via tools/run-spike.cmd from Explorer.
 - Hooks and overlay can't be unit tested: keep docs/test-matrix.md as the manual checklist the user runs on a real desktop.
 
 ## Commands
 - Build: dotnet build DragConvert.slnx
 - Test: dotnet test DragConvert.slnx
 - Smoke run (starts and exits): DragConvert.exe --smoke
+- Fetch FFmpeg for dev/tests (LGPL build into tools/bin, git-ignored): pwsh tools/fetch-ffmpeg.ps1
+- CLI harness: dotnet run --project src/DragConvert.Cli -- formats <file> | convert <file>... <format> [--out <dir>]
 - Run app: dotnet run --project src/DragConvert.App -- --console [--renderer=layered|dwm]
 - Logs: %LOCALAPPDATA%\DragConvert\logs
 
 ## Current milestone
 See docs/design.md, Implementation plan. Work on one milestone at a time.
-Status: M1 done (ADR 0001); Explorer verified, other test-matrix sources and dwm renderer still open; UI polish deferred to M3. Next: M2 core engine and first providers.
+Status: M2 done (Core engine, image + FFmpeg providers, CLI harness, ADR 0002). Next: M3 tray app and integration (wire overlay to FormatCatalog, tiles per file type, toast, UI pass).
