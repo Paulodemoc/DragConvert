@@ -40,7 +40,7 @@
     <sys:Double x:Key="Glass.LabelHeight">30</sys:Double>
     <sys:Double x:Key="Glass.InnerRadius">62</sys:Double>
     <sys:Double x:Key="Glass.Gap">10</sys:Double>
-    <sys:Double x:Key="Glass.RimPadding">12</sys:Double>
+    <sys:Double x:Key="Glass.RimPadding">10</sys:Double>
     <sys:Double x:Key="Glass.CenterGlyphSize">46</sys:Double>
     <sys:Double x:Key="Glass.BubbleGlyphSize">22</sys:Double>
     <sys:Double x:Key="Glass.HoverScale">1.08</sys:Double>

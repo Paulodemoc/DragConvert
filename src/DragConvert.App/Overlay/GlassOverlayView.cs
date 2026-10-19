@@ -27,6 +27,9 @@ internal sealed class GlassOverlayView : OverlayView
     private readonly double _innerRadius;
     private readonly double _gap;
     private readonly Ellipse _scrim;
+    private readonly Ellipse _sheen;
+    private readonly EllipseGeometry _backdropClip;
+    private readonly double _rimPadding;
     private readonly Image _backdrop = new() { Stretch = Stretch.None, IsHitTestVisible = false };
     private readonly Ellipse _disc;
     private readonly double _radius;
@@ -54,6 +57,7 @@ internal sealed class GlassOverlayView : OverlayView
         _labelHeight = OverlayTheme.Number("Glass.LabelHeight");
         _innerRadius = OverlayTheme.Number("Glass.InnerRadius");
         _gap = OverlayTheme.Number("Glass.Gap");
+        _rimPadding = OverlayTheme.Number("Glass.RimPadding");
         double frostHighlight = OverlayTheme.Number("Glass.FrostHighlight");
         double frostEdge = OverlayTheme.Number("Glass.FrostEdge");
 
@@ -69,7 +73,8 @@ internal sealed class GlassOverlayView : OverlayView
         // Frosted backdrop: the blurred screen capture (blurred before it gets here), clipped to the disc.
         _backdrop.Width = _backdrop.Height = Width;
         _backdrop.Stretch = Stretch.Fill;
-        _backdrop.Clip = new EllipseGeometry(new Point(_radius, _radius), _radius - 1, _radius - 1);
+        _backdropClip = new EllipseGeometry(new Point(_radius, _radius), _radius - 1, _radius - 1);
+        _backdrop.Clip = _backdropClip;
         _backdrop.Visibility = Visibility.Collapsed;
         _ring.Children.Add(_backdrop);
 
@@ -100,15 +105,12 @@ internal sealed class GlassOverlayView : OverlayView
         _ring.Children.Add(_disc);
 
         // Soft sheen across the upper half.
-        _ring.Children.Add(new Ellipse
+        _sheen = new Ellipse
         {
-            Width = Width - 8,
-            Height = Height - 8,
             Fill = new LinearGradientBrush(Color.FromArgb(30, 255, 255, 255), Color.FromArgb(0, 255, 255, 255), new Point(0.5, 0), new Point(0.5, 0.55)),
             IsHitTestVisible = false,
-        });
-        SetLeft(_ring.Children[^1], 4);
-        SetTop(_ring.Children[^1], 4);
+        };
+        _ring.Children.Add(_sheen);
 
         // Inner disc: a little darker, with its own faint rim.
         double inner = 2 * _innerRadius;
@@ -216,6 +218,7 @@ internal sealed class GlassOverlayView : OverlayView
         _ring.Children.Add(_center);
 
         Children.Add(_ring);
+        FitDisc();
     }
 
     public override bool WantsBackdrop => true;
@@ -272,6 +275,7 @@ internal sealed class GlassOverlayView : OverlayView
         _tiles = tiles.Take(OverlayModel.MaxTiles).ToList();
         _model = _tiles.Count > 0 ? CreateModel(_tiles.Count) : null;
         _hovered = -1;
+        FitDisc();
         SetCaption(summary);
         if (_model is null)
         {
@@ -412,6 +416,44 @@ internal sealed class GlassOverlayView : OverlayView
     }
 
     private OverlayModel CreateModel(int tiles) => new(tiles, TileBox, _innerRadius, _gap);
+
+    /// <summary>
+    /// Sizes the glass to the tiles actually shown: the farthest point of any bubble or label, plus the rim padding.
+    /// The window stays sized for eight tiles; outside the disc it's transparent, so clicks and drops pass through.
+    /// </summary>
+    private void FitDisc()
+    {
+        double radius = _innerRadius + _gap + _bubble + _rimPadding;
+        if (_model is not null)
+        {
+            const double LabelHalfWidth = 30;
+            radius = 0;
+            for (int i = 0; i < _model.TileCount; i++)
+            {
+                var (cx, cy) = _model.TileCenter(i);
+
+                // Bubble: top part of the tile box. Label: a strip along its bottom edge.
+                double bubbleY = cy - (_labelHeight / 2);
+                radius = Math.Max(radius, Math.Sqrt((cx * cx) + (bubbleY * bubbleY)) + (_bubble / 2));
+                double labelBottom = cy + (TileBox / 2);
+                double labelX = Math.Abs(cx) + LabelHalfWidth;
+                radius = Math.Max(radius, Math.Sqrt((labelX * labelX) + (labelBottom * labelBottom)));
+            }
+
+            radius += _rimPadding;
+        }
+
+        radius = Math.Min(radius, _radius);
+        foreach (Ellipse layer in new[] { _scrim, _disc })
+        {
+            layer.Width = layer.Height = 2 * radius;
+            Place(layer, Center, Center);
+        }
+
+        _sheen.Width = _sheen.Height = (2 * radius) - 8;
+        Place(_sheen, Center, Center);
+        _backdropClip.RadiusX = _backdropClip.RadiusY = radius - 1;
+    }
 
     private void ShowCenter(bool content)
     {
