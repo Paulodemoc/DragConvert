@@ -30,6 +30,25 @@ public class ModifierChordTests
         Assert.False(Chord.IsToolsMode(new KeyState(Control: false, Shift: false, Alt: true, Escape: false)));
 
     [Fact]
+    public void Tools_key_alone_counts_once_the_overlay_is_open()
+    {
+        var altOnly = new KeyState(Control: false, Shift: false, Alt: true, Escape: false);
+        Assert.True(Chord.IsToolsKeyHeld(altOnly));
+        Assert.False(Chord.IsToolsMode(altOnly));
+    }
+
+    [Theory]
+    [InlineData(Modifiers.Control | Modifiers.Shift, Modifiers.Alt)]
+    [InlineData(Modifiers.Control | Modifiers.Alt, Modifiers.Shift)]
+    [InlineData(Modifiers.Shift | Modifiers.Alt, Modifiers.Control)]
+    public void Tools_key_is_never_part_of_the_trigger(Modifiers trigger, Modifiers expectedTools)
+    {
+        ModifierChord chord = ModifierChord.ForTrigger(trigger);
+        Assert.Equal(expectedTools, chord.ToolsModifier);
+        Assert.Equal(Modifiers.None, chord.Trigger & chord.ToolsModifier);
+    }
+
+    [Fact]
     public void Empty_trigger_never_holds() =>
         Assert.False(new ModifierChord(Modifiers.None, Modifiers.Alt).IsTriggerHeld(new KeyState(true, true, true, false)));
 }

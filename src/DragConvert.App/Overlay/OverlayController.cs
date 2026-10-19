@@ -231,10 +231,10 @@ internal sealed class OverlayController : IDisposable
         {
             Hide("trigger released");
         }
-        else if (held && toolsMode != _toolsMode)
+        else if (Chord.IsToolsKeyHeld(keys) != _toolsMode)
         {
-            // Alt pressed or released while the ring is up: swap formats and tools.
-            _toolsMode = toolsMode;
+            // Once the ring is up, the tools key alone swaps formats and tools; the trigger needn't be held.
+            _toolsMode = !_toolsMode;
             ShowTiles();
         }
     }
@@ -351,7 +351,7 @@ internal sealed class OverlayController : IDisposable
 
         if (_options.Count == 0)
         {
-            _overlay.View.SetTiles([], set.Files.Count == 0 ? "No files in this drag" : _toolOptions.Count > 0 ? "No conversions · hold Alt for tools" : "Nothing here can be converted");
+            _overlay.View.SetTiles([], set.Files.Count == 0 ? "No files in this drag" : _toolOptions.Count > 0 ? $"No conversions · hold {Chord.ToolsKeyName} for tools" : "Nothing here can be converted");
             return;
         }
 
@@ -363,7 +363,7 @@ internal sealed class OverlayController : IDisposable
 
         if (_toolOptions.Count > 0)
         {
-            summary += " · Alt for tools";
+            summary += $" · {Chord.ToolsKeyName} for tools";
         }
 
         _overlay.View.SetTiles(

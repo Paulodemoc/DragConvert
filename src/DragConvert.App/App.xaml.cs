@@ -164,7 +164,7 @@ public partial class App : Application
     private static OverlayRenderer RendererFor(AppSettings settings) =>
         Enum.TryParse(settings.Renderer, ignoreCase: true, out OverlayRenderer r) && Enum.IsDefined(r) ? r : OverlayRenderer.Glass;
 
-    private static ModifierChord ChordFor(AppSettings settings) => ModifierChord.Default with { Trigger = settings.Trigger };
+    private static ModifierChord ChordFor(AppSettings settings) => ModifierChord.ForTrigger(settings.Trigger);
 
     private static bool IsElevated()
     {
