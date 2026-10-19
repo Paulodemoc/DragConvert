@@ -64,7 +64,7 @@ public sealed class MergePdfTool : IFileTool
 
     public bool Accepts(MediaFormat input) => input == MediaFormats.Pdf;
 
-    public string OutputExtension(MediaFormat input) => ".pdf";
+    public string OutputExtension(MediaFormat? input) => ".pdf";
 
     public Task RunAsync(ToolJob job, IProgress<double>? progress, CancellationToken cancellationToken) => Task.Run(
         () =>
@@ -106,7 +106,7 @@ public sealed class SplitPdfTool : IFileTool
 
     public bool Accepts(MediaFormat input) => input == MediaFormats.Pdf;
 
-    public string OutputExtension(MediaFormat input) => ".pdf";
+    public string OutputExtension(MediaFormat? input) => ".pdf";
 
     public Task RunAsync(ToolJob job, IProgress<double>? progress, CancellationToken cancellationToken) => Task.Run(
         () =>
@@ -152,7 +152,7 @@ public sealed class CompressPdfTool : IFileTool
 
     public bool Accepts(MediaFormat input) => input == MediaFormats.Pdf;
 
-    public string OutputExtension(MediaFormat input) => ".pdf";
+    public string OutputExtension(MediaFormat? input) => ".pdf";
 
     public Task RunAsync(ToolJob job, IProgress<double>? progress, CancellationToken cancellationToken) => Task.Run(
         () =>
@@ -286,7 +286,7 @@ public sealed class ImagesToPdfTool : IFileTool
 
     public bool Accepts(MediaFormat input) => Inputs.Contains(input);
 
-    public string OutputExtension(MediaFormat input) => ".pdf";
+    public string OutputExtension(MediaFormat? input) => ".pdf";
 
     public Task RunAsync(ToolJob job, IProgress<double>? progress, CancellationToken cancellationToken) => Task.Run(
         () =>

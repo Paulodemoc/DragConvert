@@ -20,6 +20,10 @@ internal static class UiGallery
     private static readonly MediaCategory Audio = MediaCategory.Audio;
     private static readonly MediaCategory Video = MediaCategory.Video;
     private static readonly MediaCategory Doc = MediaCategory.Document;
+    private static readonly MediaCategory Text = MediaCategory.Text;
+    private static readonly MediaCategory Sheet = MediaCategory.Spreadsheet;
+    private static readonly MediaCategory Subs = MediaCategory.Subtitle;
+    private static readonly MediaCategory Archive = MediaCategory.Archive;
 
     private static readonly (string Name, Action<OverlayView> Setup)[] States =
     [
@@ -85,6 +89,30 @@ internal static class UiGallery
             "Tools · Relatorio_Anual.pdf",
             animate: false);
             v.SetHovered(2);
+        }),
+        ("06d-new-categories", v =>
+        {
+            v.SetBadge(null, 4);
+            v.SetTiles(
+            [
+                T("TXT", Text, "2 of 4"), T("Markdown", Text, "1 of 4"), T("HTML", Text, "1 of 4"),
+                T("XLSX", Sheet, "1 of 4"), T("TSV", Sheet, "1 of 4"), T("VTT", Subs, "1 of 4"),
+            ],
+            "4 files · report.docx, data.csv, film.srt…",
+            animate: false);
+            v.SetHovered(3);
+        }),
+        ("06e-archive-tools", v =>
+        {
+            v.SetBadge(Archive, 1);
+            v.SetTiles(
+            [
+                new OverlayTile("Extract", null, Archive, ""),
+                new OverlayTile("Zip", null, Archive, ""),
+            ],
+            "Tools · photos.7z",
+            animate: false);
+            v.SetHovered(0);
         }),
         ("07-nothing-to-convert", v =>
         {

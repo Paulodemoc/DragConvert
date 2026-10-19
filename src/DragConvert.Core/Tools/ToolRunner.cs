@@ -26,9 +26,9 @@ public sealed class ToolRunner : IDisposable
         string? outputDirectory = null,
         CancellationToken cancellationToken = default)
     {
-        if (tool.CombinesInputs && files.Count < 2)
+        if (files.Count < tool.MinimumInputs)
         {
-            return [ToolResult.Failure(tool, files, $"{tool.DisplayName} needs at least two files.")];
+            return [ToolResult.Failure(tool, files, $"{tool.DisplayName} needs at least {tool.MinimumInputs} files.")];
         }
 
         IReadOnlyList<IReadOnlyList<string>> runs = tool.CombinesInputs ? [files] : files.Select(f => (IReadOnlyList<string>)[f]).ToList();
@@ -89,7 +89,12 @@ public sealed class ToolRunner : IDisposable
             }
 
             string first = inputs[0];
-            MediaFormat format = MediaFormats.FromPath(first) ?? throw new ConversionException($"{tool.DisplayName} can't open {Path.GetFileName(first)}.");
+            MediaFormat? format = MediaFormats.FromPath(first);
+            if (format is null && !tool.AcceptsAnyFile)
+            {
+                throw new ConversionException($"{tool.DisplayName} can't open {Path.GetFileName(first)}.");
+            }
+
             bool folder = tool.OutputKind == ToolOutputKind.Folder;
             string extension = folder ? string.Empty : tool.OutputExtension(format);
             string finalPath = OutputPaths.PlanFinal(first, tool.NameSuffix, extension, outputDirectory);

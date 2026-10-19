@@ -1,6 +1,7 @@
 using DragConvert.Core.Conversion;
 using DragConvert.Providers.Ffmpeg;
 using DragConvert.Providers.Image;
+using DragConvert.Providers.Documents;
 
 namespace DragConvert.Providers;
 
@@ -11,5 +12,8 @@ public static class DefaultProviders
     [
         new ImageProvider(),
         new FfmpegProvider(ffmpegPath ?? FfmpegLocator.Find()),
+        new DocumentTextProvider(),
+        new SpreadsheetProvider(),
+        new SubtitleProvider(),
     ];
 }

@@ -8,6 +8,10 @@
   <ItemGroup>
     <PackageReference Include="Magick.NET-Q8-AnyCPU" />
     <PackageReference Include="PDFsharp" />
+    <PackageReference Include="PdfPig" />
+    <PackageReference Include="DocumentFormat.OpenXml" />
+    <PackageReference Include="Markdig" />
+    <PackageReference Include="SharpCompress" />
   </ItemGroup>
 
   <ItemGroup>

@@ -29,12 +29,12 @@ public sealed class EndToEndTests(MediaFixtures fixtures) : IClassFixture<MediaF
         var catalog = new FormatCatalog(DefaultProviders.Create(fixtures.Ffmpeg));
 
         Assert.Equal(
-            [MediaFormats.Jpeg, MediaFormats.Png, MediaFormats.WebP, MediaFormats.Tiff, MediaFormats.Bmp, MediaFormats.Gif, MediaFormats.Pdf],
+            [MediaFormats.Jpeg, MediaFormats.Png, MediaFormats.WebP, MediaFormats.Avif, MediaFormats.Tiff, MediaFormats.Bmp, MediaFormats.Gif, MediaFormats.Pdf],
             catalog.TargetsFor("photo.heic"));
 
         Assert.SkipWhen(fixtures.Ffmpeg is null, "ffmpeg not found");
         Assert.Equal(
-            [MediaFormats.Mp3, MediaFormats.M4a, MediaFormats.Flac, MediaFormats.Ogg, MediaFormats.Opus],
+            [MediaFormats.Mp3, MediaFormats.M4a, MediaFormats.Flac, MediaFormats.Ogg, MediaFormats.Opus, MediaFormats.Aiff, MediaFormats.Wma],
             catalog.TargetsFor("voice.wav"));
     }
 }

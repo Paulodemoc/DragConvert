@@ -141,7 +141,7 @@ public sealed class ToolRunnerTests : IDisposable
 
         public bool Accepts(MediaFormat input) => input == Pdf;
 
-        public string OutputExtension(MediaFormat input) => input.Extension;
+        public string OutputExtension(MediaFormat? input) => input?.Extension ?? string.Empty;
 
         public async Task RunAsync(ToolJob job, IProgress<double>? progress, CancellationToken cancellationToken)
         {

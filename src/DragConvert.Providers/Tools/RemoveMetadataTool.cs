@@ -37,7 +37,7 @@ public sealed class RemoveMetadataTool(string? ffmpegPath) : IFileTool
     public bool Accepts(MediaFormat input) =>
         Lossless.Contains(input) || ViaMagick.Contains(input) || input == Pdf || (HasFfmpeg && Media.Contains(input));
 
-    public string OutputExtension(MediaFormat input) => input.Extension;
+    public string OutputExtension(MediaFormat? input) => input?.Extension ?? string.Empty;
 
     public async Task RunAsync(ToolJob job, IProgress<double>? progress, CancellationToken cancellationToken)
     {

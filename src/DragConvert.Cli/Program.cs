@@ -10,8 +10,8 @@ const string Usage = """
       dragconvert convert <file>... <format> [--out <dir>]
                                                         Convert files; output goes beside each file (or into <dir>)
       dragconvert tool <tool-id> <file>... [--out <dir>]
-                                                        Run a tool: merge-pdf, split-pdf, pdf-to-images,
-                                                        compress-pdf, images-to-pdf, remove-metadata
+                                                        Run a tool (see "formats" output for the ids that
+                                                        apply to a file), e.g. compress-pdf, extract, create-zip
     Formats are ids, names or extensions: jpeg, PNG, webp, mp3, mp4, gif, pdf...
     """;
 

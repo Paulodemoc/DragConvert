@@ -12,10 +12,10 @@ namespace DragConvert.Providers.Ffmpeg;
 /// </summary>
 public sealed partial class FfmpegProvider : IConversionProvider
 {
-    private static readonly MediaFormat[] AudioInputs = [Mp3, M4a, Wav, Flac, Ogg, Opus, Wma];
-    private static readonly MediaFormat[] AudioTargets = [Mp3, M4a, Wav, Flac, Ogg, Opus];
+    private static readonly MediaFormat[] AudioInputs = [Mp3, M4a, Wav, Flac, Ogg, Opus, Aiff, Wma];
+    private static readonly MediaFormat[] AudioTargets = [Mp3, M4a, Wav, Flac, Ogg, Opus, Aiff, Wma];
     private static readonly MediaFormat[] VideoInputs = [Mp4, WebM, Mov, Mkv, Avi, Wmv];
-    private static readonly MediaFormat[] VideoTargets = [Mp4, WebM, Gif, Mp3, M4a];
+    private static readonly MediaFormat[] VideoTargets = [Mp4, WebM, Mov, Mkv, Avi, Wmv, Gif, Mp3, M4a];
 
     private readonly string? _ffmpegPath;
     private readonly TimeSpan _timeout;
@@ -57,7 +57,7 @@ public sealed partial class FfmpegProvider : IConversionProvider
             cancellationToken: cancellationToken).ConfigureAwait(false);
         if (result.ExitCode != 0)
         {
-            Capabilities = Capabilities.Where(c => c.Target != Mp4).ToArray();
+            Capabilities = Capabilities.Where(c => c.Target != Mp4 && c.Target != Mov && c.Target != Mkv).ToArray();
             return false;
         }
 
@@ -113,14 +113,13 @@ public sealed partial class FfmpegProvider : IConversionProvider
         "flac" => ["-vn", "-c:a", "flac"],
         "ogg" => ["-vn", "-c:a", "libvorbis", "-q:a", "5"],
         "opus" => ["-vn", "-c:a", "libopus", "-b:a", "128k"],
-        "mp4" =>
-        [
-            // h264_mf needs NV12, even dimensions and at least 64 px per side: upscale tiny inputs keeping aspect.
-            "-vf", "scale='if(lt(iw,ih),max(64,iw),-2)':'if(lt(iw,ih),-2,max(64,ih))',scale=trunc(iw/2)*2:trunc(ih/2)*2",
-            "-pix_fmt", "nv12",
-            "-c:v", "h264_mf", "-rate_control", "quality", "-quality", "70",
-            "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart",
-        ],
+        "aiff" => ["-vn", "-c:a", "pcm_s16be"],
+        "wma" => ["-vn", "-c:a", "wmav2", "-b:a", "192k"],
+        "mp4" => [.. H264, "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart"],
+        "mov" => [.. H264, "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart"],
+        "mkv" => [.. H264, "-c:a", "aac", "-b:a", "160k"],
+        "avi" => ["-vf", EvenSize, "-c:v", "mpeg4", "-q:v", "3", "-c:a", "libmp3lame", "-q:a", "3"],
+        "wmv" => ["-vf", EvenSize, "-c:v", "wmv2", "-b:v", "6M", "-c:a", "wmav2", "-b:a", "160k"],
         "webm" =>
         [
             "-c:v", "libvpx-vp9", "-crf", "33", "-b:v", "0", "-deadline", "good", "-cpu-used", "4", "-row-mt", "1",
@@ -132,6 +131,19 @@ public sealed partial class FfmpegProvider : IConversionProvider
         ],
         _ => throw new ConversionException($"FFmpeg can't produce {target.DisplayName}."),
     };
+
+    private const string EvenSize = "scale=trunc(iw/2)*2:trunc(ih/2)*2";
+
+    /// <summary>
+    /// H.264 through Windows' encoder (h264_mf): it needs NV12, even dimensions and at least 64 px per side, so tiny
+    /// inputs are upscaled keeping their aspect.
+    /// </summary>
+    private static readonly string[] H264 =
+    [
+        "-vf", "scale='if(lt(iw,ih),max(64,iw),-2)':'if(lt(iw,ih),-2,max(64,ih))',scale=trunc(iw/2)*2:trunc(ih/2)*2",
+        "-pix_fmt", "nv12",
+        "-c:v", "h264_mf", "-rate_control", "quality", "-quality", "70",
+    ];
 
     private static IEnumerable<ConversionCapability> Routes(MediaFormat[] inputs, MediaFormat[] targets) =>
         from input in inputs

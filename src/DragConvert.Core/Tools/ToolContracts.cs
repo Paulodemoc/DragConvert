@@ -40,10 +40,16 @@ public interface IFileTool
     /// <summary>Added to the first input's name: " (compressed)", " pages".</summary>
     string NameSuffix { get; }
 
+    /// <summary>Fewest matching files a run needs: two for merging tools, one otherwise (or for "zip these").</summary>
+    int MinimumInputs => CombinesInputs ? 2 : 1;
+
+    /// <summary>True when the tool also takes files of unknown types (creating a ZIP works on anything).</summary>
+    bool AcceptsAnyFile => false;
+
     bool Accepts(MediaFormat input);
 
-    /// <summary>Extension of a file output for this input (ignored for folder outputs).</summary>
-    string OutputExtension(MediaFormat input);
+    /// <summary>Extension of a file output for this input (ignored for folder outputs); input is null for unknown types.</summary>
+    string OutputExtension(MediaFormat? input);
 
     /// <summary>Runs the tool. Throws <see cref="ConversionException"/> with a one-line reason on failure.</summary>
     Task RunAsync(ToolJob job, IProgress<double>? progress, CancellationToken cancellationToken);

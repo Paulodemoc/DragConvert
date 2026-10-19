@@ -9,16 +9,22 @@ using Windows.Storage.Streams;
 namespace DragConvert.Providers.Windows;
 
 /// <summary>
-/// Renders each page of a PDF to a PNG in a folder "&lt;name&gt; images", with Windows' built-in PDF renderer
+/// Renders each page of a PDF to a PNG or JPEG in a folder "&lt;name&gt; images", with Windows' built-in PDF renderer
 /// (Windows.Data.Pdf), so no PDF engine has to be bundled. Pages render at 150 DPI on a white background.
 /// </summary>
-public sealed class PdfToImagesTool : IFileTool
+public sealed class PdfToImagesTool(PdfToImagesTool.ImageKind kind = PdfToImagesTool.ImageKind.Png) : IFileTool
 {
     private const double Dpi = 150;
 
-    public string Id => "pdf-to-images";
+    public enum ImageKind
+    {
+        Png,
+        Jpeg,
+    }
 
-    public string DisplayName => "Pages to images";
+    public string Id => kind == ImageKind.Png ? "pdf-to-images" : "pdf-to-jpg";
+
+    public string DisplayName => kind == ImageKind.Png ? "Pages to PNG" : "Pages to JPG";
 
     public string Glyph => ""; // Photo
 
@@ -32,7 +38,7 @@ public sealed class PdfToImagesTool : IFileTool
 
     public bool Accepts(MediaFormat input) => input == MediaFormats.Pdf;
 
-    public string OutputExtension(MediaFormat input) => ".png";
+    public string OutputExtension(MediaFormat? input) => kind == ImageKind.Png ? ".png" : ".jpg";
 
     public async Task RunAsync(ToolJob job, IProgress<double>? progress, CancellationToken cancellationToken)
     {
@@ -65,11 +71,11 @@ public sealed class PdfToImagesTool : IFileTool
             {
                 DestinationWidth = (uint)Math.Round(page.Size.Width * Dpi / 96),
                 DestinationHeight = (uint)Math.Round(page.Size.Height * Dpi / 96),
-                BitmapEncoderId = BitmapEncoder.PngEncoderId,
+                BitmapEncoderId = kind == ImageKind.Png ? BitmapEncoder.PngEncoderId : BitmapEncoder.JpegEncoderId,
             };
             await page.RenderToStreamAsync(rendered, options);
 
-            string output = Path.Combine(job.OutputPath, $"{name} - page {(i + 1).ToString(digits, CultureInfo.InvariantCulture)}.png");
+            string output = Path.Combine(job.OutputPath, $"{name} - page {(i + 1).ToString(digits, CultureInfo.InvariantCulture)}{OutputExtension(null)}");
             await using (FileStream target = File.Create(output))
             {
                 rendered.Seek(0);

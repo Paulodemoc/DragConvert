@@ -139,11 +139,11 @@ internal sealed class ConversionCoordinator : IDisposable
             var (accepted, skipped) = ToolCatalog.Plan(tool, set.Files);
             Logger.Information("Tool {Tool}: {Files} file(s); using {Accepted}, skipping {Skipped}", tool.Id, set.Files.Count, accepted.Count, skipped.Count);
 
-            if (accepted.Count < (tool.CombinesInputs ? 2 : 1))
+            if (accepted.Count < tool.MinimumInputs)
             {
                 _notifications.Show(new NotificationText(
                     $"{tool.DisplayName}: nothing to do",
-                    tool.CombinesInputs ? $"{tool.DisplayName} needs at least two matching files." : $"{tool.DisplayName} doesn't apply to these files."));
+                    tool.MinimumInputs > 1 ? $"{tool.DisplayName} needs at least {tool.MinimumInputs} matching files." : $"{tool.DisplayName} doesn't apply to these files."));
                 return BatchOutcome.Nothing;
             }
 

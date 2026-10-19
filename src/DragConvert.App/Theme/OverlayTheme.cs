@@ -106,6 +106,10 @@ internal sealed class OverlayTheme
         MediaCategory.Audio => "",    // Audio
         MediaCategory.Video => "",    // Video
         MediaCategory.Document => "", // Document
+        MediaCategory.Text => "\uE8D2",        // TextEdit-style page
+        MediaCategory.Subtitle => "\uE7F0",    // ClosedCaption
+        MediaCategory.Spreadsheet => "\uE80A", // Grid
+        MediaCategory.Archive => "\uE7B8",     // Package
         _ => "",                      // Page
     };
 

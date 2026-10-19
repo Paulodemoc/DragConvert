@@ -10,8 +10,8 @@ namespace DragConvert.Providers.Image;
 /// </summary>
 public sealed class ImageProvider : IConversionProvider
 {
-    private static readonly MediaFormat[] Inputs = [Jpeg, Png, WebP, Heic, Tiff, Bmp, Gif];
-    private static readonly MediaFormat[] Targets = [Jpeg, Png, WebP, Tiff, Bmp, Gif, Pdf];
+    private static readonly MediaFormat[] Inputs = [Jpeg, Png, WebP, Avif, Heic, Tiff, Bmp, Gif, Svg];
+    private static readonly MediaFormat[] Targets = [Jpeg, Png, WebP, Avif, Tiff, Bmp, Gif, Pdf];
 
     public string Id => "image";
 
@@ -39,7 +39,10 @@ public sealed class ImageProvider : IConversionProvider
     private static void Convert(ConversionJob job, CancellationToken cancellationToken)
     {
         MagickFormat format = ToMagick(job.Target);
-        using var frames = new MagickImageCollection(job.InputPath);
+
+        // SVG is rasterised at 192 DPI (twice its nominal size) so the result isn't small and soft.
+        var settings = MediaFormats.FromPath(job.InputPath) == Svg ? new MagickReadSettings { Density = new Density(192) } : null;
+        using var frames = settings is null ? new MagickImageCollection(job.InputPath) : new MagickImageCollection(job.InputPath, settings);
         cancellationToken.ThrowIfCancellationRequested();
 
         if (frames.Count == 0)
@@ -87,6 +90,7 @@ public sealed class ImageProvider : IConversionProvider
         {
             MagickFormat.Jpeg => 90,
             MagickFormat.WebP => 85,
+            MagickFormat.Avif => 70,
             _ => image.Quality,
         };
     }
@@ -96,6 +100,7 @@ public sealed class ImageProvider : IConversionProvider
         "jpeg" => MagickFormat.Jpeg,
         "png" => MagickFormat.Png,
         "webp" => MagickFormat.WebP,
+        "avif" => MagickFormat.Avif,
         "tiff" => MagickFormat.Tiff,
         "bmp" => MagickFormat.Bmp,
         "gif" => MagickFormat.Gif,

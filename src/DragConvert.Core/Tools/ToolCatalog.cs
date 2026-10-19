@@ -16,8 +16,8 @@ public sealed class ToolCatalog(IEnumerable<IFileTool> tools)
         var options = new List<ToolOption>();
         foreach (IFileTool tool in _tools)
         {
-            int count = formats.Count(f => f is not null && tool.Accepts(f));
-            if (count >= (tool.CombinesInputs ? 2 : 1))
+            int count = formats.Count(f => Takes(tool, f));
+            if (count >= tool.MinimumInputs)
             {
                 options.Add(new ToolOption(tool, count, inputPaths.Count));
             }
@@ -33,9 +33,11 @@ public sealed class ToolCatalog(IEnumerable<IFileTool> tools)
         var skipped = new List<string>();
         foreach (string file in files)
         {
-            (MediaFormats.FromPath(file) is { } format && tool.Accepts(format) ? accepted : skipped).Add(file);
+            (Takes(tool, MediaFormats.FromPath(file)) ? accepted : skipped).Add(file);
         }
 
         return (accepted, skipped);
     }
+
+    private static bool Takes(IFileTool tool, MediaFormat? format) => format is null ? tool.AcceptsAnyFile : tool.Accepts(format);
 }

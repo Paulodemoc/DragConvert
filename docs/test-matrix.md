@@ -106,6 +106,23 @@ Start with `tools\run-spike.cmd` (non-elevated). Notifications appear bottom-rig
 | P9 | Password-protected PDF → Split pages | Notification says the PDF is password-protected | |
 | P10 | Tray window with a PDF | Tools section below formats; buttons work with Tab/Enter | |
 
+## M4b: format breadth
+
+| # | Check | Expected | Result |
+|---|---|---|---|
+| F1 | Drag an iPhone HEIC photo onto AVIF | "<name>.avif" opens in the Photos app | |
+| F2 | Drag an SVG logo onto PNG | Sharp PNG at twice the SVG's size, transparent background kept | |
+| F3 | Drag an MP4 onto MOV, MKV, AVI and WMV (one at a time) | Each plays in Media Player / VLC with sound | |
+| F4 | Drag a Word document onto Markdown and HTML | Headings, bold, links and tables survive; HTML opens in the browser | |
+| F5 | Drag a text-based PDF onto TXT | Text page by page; a scanned PDF gives an almost empty file | |
+| F6 | Drag a CSV exported from Excel (with accents) onto XLSX, then the XLSX back onto CSV | Both open in Excel with accents intact and numbers as numbers | |
+| F7 | Drag an SRT onto VTT | Plays as subtitles in a browser `<track>` or VLC with the same timings | |
+| F8 | Alt-tools on a photo, an MP3 and a phone video: Compress | Smaller copies that look/sound fine; overlay shows one Compress tile | |
+| F9 | Alt-tools on an MP3: Normalize, Make mono, Waveform | Even loudness; mono file; PNG of the waveform | |
+| F10 | Alt-tools on a video: Mute, Snapshot | Silent copy; JPG of a representative frame | |
+| F11 | Drag a ZIP, a .tar.gz, a RAR and a 7z, Alt, Extract | Folder beside each archive with its contents; a password-protected one reports it | |
+| F12 | Drag a mixed selection (e.g. a PDF, a TXT and an EXE), Alt, Zip | One ZIP keeping the files' relative folders | |
+
 ## M5: hardening
 
 | # | Check | Expected | Result |
