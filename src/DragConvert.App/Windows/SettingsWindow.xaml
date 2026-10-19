@@ -19,8 +19,8 @@
         </ComboBox>
         <TextBlock Text="Overlay style:" TextWrapping="Wrap" Margin="0,4,0,4" />
         <ComboBox x:Name="RendererBox" SelectionChanged="OnChanged" Margin="0,0,0,16" AutomationProperties.Name="Overlay style">
-            <ComboBoxItem Content="Glass" Tag="glass" />
             <ComboBoxItem Content="Segments" Tag="segments" />
+            <ComboBoxItem Content="Glass" Tag="glass" />
             <ComboBoxItem Content="Ring" Tag="layered" />
         </ComboBox>
 

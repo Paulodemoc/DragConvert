@@ -15,7 +15,7 @@
 ![Offline](https://img.shields.io/badge/runs-100%25%20offline-2EA44F)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-<img src="docs/images/overlay-glass.png" width="420" alt="The glass overlay showing target formats for a mixed drop of five files">
+<img src="docs/images/overlay-segments.png" width="420" alt="The Segments overlay showing target formats for a mixed drop of five files">
 
 </div>
 
@@ -35,13 +35,13 @@ original file is never touched.
   overwritten; a crash leaves no half-written files behind.
 - **Light on resources.** Idle at 0% CPU and a few MB of working set; the mouse hook steps aside for fullscreen
   apps, games and remote-desktop sessions.
-- **Three overlay styles**, switchable live in Settings, following Windows' light, dark and high-contrast themes:
+- **Three overlay styles** (Segments by default, Glass and Ring), switchable live in Settings, following Windows' light, dark and high-contrast themes:
 
 <div align="center">
-<img src="docs/images/overlay-segments.png" width="260" alt="Segments style">&nbsp;
+<img src="docs/images/overlay-glass.png" width="260" alt="Glass style">&nbsp;
 <img src="docs/images/overlay-ring.png" width="260" alt="Ring style">&nbsp;
 <img src="docs/images/overlay-tools.png" width="260" alt="Tools dial on a PDF">
-<br><sub>Segments · Ring · Tools (Alt) on a PDF</sub>
+<br><sub>Glass · Ring · Tools (Alt) on a PDF</sub>
 </div>
 
 ## What it converts

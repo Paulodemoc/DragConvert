@@ -1,7 +1,7 @@
 namespace DragConvert.Providers.Ffmpeg;
 
 /// <summary>
-/// Finds ffmpeg.exe: the DRAGCONVERT_FFMPEG environment variable, next to the app, the repo's tools/bin
+/// Finds ffmpeg.exe: the DRAGCONVERT_FFMPEG environment variable, next to the app (or the exe a link points to), the repo's tools/bin
 /// (development), then PATH.
 /// </summary>
 public static class FfmpegLocator
@@ -16,11 +16,14 @@ public static class FfmpegLocator
         }
 
         string baseDir = AppContext.BaseDirectory;
-        foreach (string candidate in new[] { Path.Combine(baseDir, executableName), Path.Combine(baseDir, "engines", executableName) })
+        foreach (string dir in AppDirectories(baseDir))
         {
-            if (File.Exists(candidate))
+            foreach (string candidate in new[] { Path.Combine(dir, executableName), Path.Combine(dir, "engines", executableName) })
             {
-                return candidate;
+                if (File.Exists(candidate))
+                {
+                    return candidate;
+                }
             }
         }
 
@@ -39,5 +42,31 @@ public static class FfmpegLocator
             .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Select(d => Path.Combine(d, executableName))
             .FirstOrDefault(File.Exists);
+    }
+
+    /// <summary>
+    /// The real app folder first: started through a symbolic link (winget's command alias in WinGet\Links), the base
+    /// directory is the link's folder, which may hold other packages' ffmpeg.exe.
+    /// </summary>
+    private static IEnumerable<string> AppDirectories(string baseDir)
+    {
+        if (Environment.ProcessPath is { } process)
+        {
+            FileSystemInfo? target = null;
+            try
+            {
+                target = File.ResolveLinkTarget(process, returnFinalTarget: true);
+            }
+            catch (IOException)
+            {
+            }
+
+            if (target is not null && Path.GetDirectoryName(target.FullName) is { } real)
+            {
+                yield return real;
+            }
+        }
+
+        yield return baseDir;
     }
 }

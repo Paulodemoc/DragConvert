@@ -40,7 +40,7 @@ Status: accepted, pending the owner's review of the look
 - **Acrylic panel showed flat grey**: DWM draws system backdrops only for *active* windows, and the overlay is
   never activated. Fix: send `WM_NCACTIVATE(TRUE)` after showing and swallow `WM_NCACTIVATE(FALSE)`; the frame looks
   active, focus never moves. Verified with a desktop screenshot (`--preview-overlay=dwm`).
-- **New "Glass" style (now the default)**, modelled on the owner's reference: a translucent blue disc with a rim
+- **New "Glass" style (the default until Addendum 3)**, modelled on the owner's reference: a translucent blue disc with a rim
   highlight, a darker inner disc with a large icon and count badge, round glass bubbles with labels, and a bright
   glowing bubble on hover.
 - **Round blur**: every Windows blur API blurs the whole window *rectangle*. Tried and rejected, each verified with
@@ -82,3 +82,5 @@ Status: accepted, pending the owner's review of the look
   sits inside the centre circle.
 - It uses the same frosted backdrop and brightness-aware darkening as Glass. Hit testing is by angle, as for the
   other styles.
+- **Segments is the default style** (owner's choice, 2026-10-19), for new installs and unreadable settings. Glass
+  and Ring remain in Settings; saved settings keep their choice.

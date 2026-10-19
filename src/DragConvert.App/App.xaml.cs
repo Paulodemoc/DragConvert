@@ -272,7 +272,7 @@ public partial class App : Application
     /// </summary>
     private static OverlayRenderer RendererFor(AppSettings settings) =>
         SystemParameters.HighContrast ? OverlayRenderer.Layered
-        : Enum.TryParse(settings.Renderer, ignoreCase: true, out OverlayRenderer r) && Enum.IsDefined(r) ? r : OverlayRenderer.Glass;
+        : Enum.TryParse(settings.Renderer, ignoreCase: true, out OverlayRenderer r) && Enum.IsDefined(r) ? r : OverlayRenderer.Segments;
 
     /// <summary>On Windows "N" editions without Media Foundation, MP4 (h264_mf) can't encode: hide it.</summary>
     private static async Task ProbeH264Async(IReadOnlyList<IConversionProvider> converters, FormatCatalog catalog)
