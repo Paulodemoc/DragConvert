@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>DragConvert</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="H.NotifyIcon.Wpf" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DragConvert.Core\DragConvert.Core.csproj" />
+    <ProjectReference Include="..\DragConvert.Providers\DragConvert.Providers.csproj" />
+    <ProjectReference Include="..\DragConvert.Native\DragConvert.Native.csproj" />
+  </ItemGroup>
+
+</Project>

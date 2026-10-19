@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore DragConvert.slnx
+
+      - name: Build (warnings are errors)
+        run: dotnet build DragConvert.slnx --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test DragConvert.slnx --configuration Release --no-build --logger trx --results-directory TestResults
+
+      - name: Smoke-run the app
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath "src/DragConvert.App/bin/Release/net10.0-windows/DragConvert.exe" -ArgumentList "--smoke" -PassThru
+          if (-not $p.WaitForExit(30000)) { $p.Kill(); throw "App did not exit within 30 s" }
+          if ($p.ExitCode -ne 0) { throw "App exited with code $($p.ExitCode)" }
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults

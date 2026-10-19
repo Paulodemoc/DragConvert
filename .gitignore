@@ -1,0 +1,43 @@
+# Build output
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+artifacts/
+publish/
+*.binlog
+
+# IDE / user files
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.rsuser
+*.DotSettings.user
+
+# Test results
+TestResults/
+*.trx
+coverage*.xml
+
+# NuGet
+*.nupkg
+*.snupkg
+packages/
+
+# Bundled third-party engines (fetched by tools/, not committed)
+tools/bin/
+ffmpeg*.exe
+exiftool*.exe
+
+# Packaging / signing
+AppPackages/
+*.msix
+*.appx
+*.pfx
+
+# OS
+Thumbs.db
+desktop.ini
+.DS_Store

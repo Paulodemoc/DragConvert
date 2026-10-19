@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/DragConvert.App/DragConvert.App.csproj" />
+    <Project Path="src/DragConvert.Core/DragConvert.Core.csproj" />
+    <Project Path="src/DragConvert.Native/DragConvert.Native.csproj" />
+    <Project Path="src/DragConvert.Providers/DragConvert.Providers.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/DragConvert.Core.Tests/DragConvert.Core.Tests.csproj" />
+    <Project Path="tests/DragConvert.Native.Tests/DragConvert.Native.Tests.csproj" />
+    <Project Path="tests/DragConvert.Providers.Tests/DragConvert.Providers.Tests.csproj" />
+  </Folder>
+</Solution>
