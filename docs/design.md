@@ -55,7 +55,7 @@ The core flow is drag, hold the trigger, drop on a format tile; the app saves a 
 3. A small topmost overlay appears near the cursor with format tiles chosen for the file type (for example HEIC shows JPEG, PNG, WebP, PDF).
 4. Holding Alt as well swaps the tiles for tools (compress PDF, strip metadata, split).
 5. The user drops on a tile. Conversion runs in the background.
-6. A toast reports the result with Open and Show in folder actions; failures show a one-line reason.
+6. A toast reports the result with Open and Show in folder actions; failures show a one-line reason. A batch gets one summary toast ("5 converted, 1 failed: <reason>"), and problems that stop a conversion before it starts (engine missing, nothing convertible, running elevated) get a toast too.
 7. Releasing the trigger or pressing Esc dismisses the overlay and the drag proceeds normally.
 
 **Secondary entry points**
@@ -66,7 +66,9 @@ The core flow is drag, hold the trigger, drop on a format tile; the app saves a 
 
 **Behavior rules**
 
-- Multi-file drags convert each file; mixed types show only formats valid for all, otherwise a per-type picker.
+- Multi-file drags convert each file. Mixed types show every format that applies to at least one file, labelled with a count ("JPEG · 3 of 5"), formats valid for all files first; dropping converts the files that fit and skips the rest (see ADR 0003).
+- Dropped folders expand recursively (subfolders included, folder links not followed, capped at 10,000 files); each output goes beside its original. Above about 200 files, the notification asks for confirmation before starting.
+- Files nothing can convert (for example a .docx in the mix) are skipped and named in the summary notification.
 - Output name: `<name>.<newext>`; on collision append `  (1) `, never overwrite.
 - Overlay never steals focus and never blocks the underlying drag if the user ignores it.
 - Dark and light themes follow the system; overlay respects per-monitor DPI.

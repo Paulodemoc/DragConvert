@@ -34,6 +34,31 @@ public class FormatCatalogTests
     }
 
     [Fact]
+    public void Target_options_list_every_target_with_counts_and_all_file_targets_first()
+    {
+        var video = new FakeProvider("video", new ConversionCapability(Mp4, Gif), new ConversionCapability(Mp4, Mp3));
+        var images = new FakeProvider("img", new ConversionCapability(Png, Jpeg), new ConversionCapability(Png, Gif));
+        var catalog = new FormatCatalog([images, video]);
+
+        IReadOnlyList<TargetOption> options = catalog.TargetOptionsFor(["a.png", "b.png", "c.png", "d.mp4", "e.mp4"]);
+
+        Assert.Equal(
+            [new TargetOption(Gif, 5, 5), new TargetOption(Jpeg, 3, 5), new TargetOption(Mp3, 2, 5)],
+            options);
+        Assert.True(options[0].AppliesToAll);
+        Assert.False(options[1].AppliesToAll);
+    }
+
+    [Fact]
+    public void Files_with_no_conversions_still_count_toward_the_total()
+    {
+        var catalog = new FormatCatalog([Images]);
+        TargetOption only = Assert.Single(catalog.TargetOptionsFor(["a.png", "notes.docx"]), o => o.Target == Jpeg);
+        Assert.Equal(1, only.FileCount);
+        Assert.Equal(2, only.TotalFiles);
+    }
+
+    [Fact]
     public void Unavailable_providers_are_ignored()
     {
         var missingEngine = new FakeProvider("ffmpeg", new ConversionCapability(Wav, Mp3)) { IsAvailable = false };

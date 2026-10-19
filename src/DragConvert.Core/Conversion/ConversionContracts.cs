@@ -1,5 +1,11 @@
 namespace DragConvert.Core.Conversion;
 
+/// <summary>A target offered for a set of files, and how many of them it applies to.</summary>
+public sealed record TargetOption(MediaFormat Target, int FileCount, int TotalFiles)
+{
+    public bool AppliesToAll => FileCount == TotalFiles;
+}
+
 /// <summary>One input format a provider can turn into one target format.</summary>
 public sealed record ConversionCapability(MediaFormat Input, MediaFormat Target);
 

@@ -40,6 +40,30 @@ public sealed class FormatCatalog
         return common?.ToList() ?? [];
     }
 
+    /// <summary>
+    /// Every target that applies to at least one file, with how many files it applies to (the overlay shows
+    /// "JPEG · 3 of 5"). Targets valid for all files come first, then by count, then in <see cref="MediaFormats.All"/> order.
+    /// Dropping on a target converts the files it applies to and skips the rest.
+    /// </summary>
+    public IReadOnlyList<TargetOption> TargetOptionsFor(IReadOnlyCollection<string> inputPaths)
+    {
+        var counts = new Dictionary<MediaFormat, int>();
+        foreach (string path in inputPaths)
+        {
+            foreach (MediaFormat target in TargetsFor(path))
+            {
+                counts[target] = counts.GetValueOrDefault(target) + 1;
+            }
+        }
+
+        return MediaFormats.All
+            .Where(counts.ContainsKey)
+            .Select(t => new TargetOption(t, counts[t], inputPaths.Count))
+            .OrderByDescending(o => o.AppliesToAll)
+            .ThenByDescending(o => o.FileCount)
+            .ToList();
+    }
+
     public IConversionProvider? FindProvider(string inputPath, MediaFormat target)
     {
         MediaFormat? input = MediaFormats.FromPath(inputPath);
