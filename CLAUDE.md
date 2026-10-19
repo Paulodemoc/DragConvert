@@ -26,6 +26,7 @@ C# 14, .NET 10, WPF (Fluent theme), CsWin32. Solution in src/, tests in tests/.
 - Fetch FFmpeg for dev/tests (LGPL build into tools/bin, git-ignored): pwsh tools/fetch-ffmpeg.ps1
 - UI gallery (every overlay state, live): DragConvert.exe --gallery
 - UI snapshots to PNG (review visuals; also regenerates Assets/DragConvert.ico source): DragConvert.exe --snapshot[=dir] (default artifacts/ui)
+- Real overlay window for screenshots (DWM effects, glass backdrop): DragConvert.exe --preview-overlay[=glass|layered|dwm]
 - CLI harness: dotnet run --project src/DragConvert.Cli -- formats <file> | convert <file>... <format> [--out <dir>]
 - Run app: dotnet run --project src/DragConvert.App -- --console [--renderer=layered|dwm]
 - Logs: %LOCALAPPDATA%\DragConvert\logs

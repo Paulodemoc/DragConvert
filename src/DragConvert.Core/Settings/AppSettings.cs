@@ -26,8 +26,8 @@ public sealed record AppSettings
 
     public bool SendToMenu { get; init; } = true;
 
-    /// <summary>"layered" or "dwm"; applied at the next start.</summary>
-    public string Renderer { get; init; } = "layered";
+    /// <summary>"glass", "layered" (ring) or "dwm" (acrylic panel); applied at the next start.</summary>
+    public string Renderer { get; init; } = "glass";
 
     /// <summary>Folder outputs go to, or null for "beside each original".</summary>
     public string? OutputDirectory =>

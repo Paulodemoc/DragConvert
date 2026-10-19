@@ -54,6 +54,14 @@ public partial class App : Application
             return;
         }
 
+        if (options.PreviewOverlay is { } previewRenderer)
+        {
+            ConfigureLogging(console: false);
+            DispatcherUnhandledException += (_, args) => Log.Fatal(args.Exception, "Unhandled exception in overlay preview");
+            UiGallery.PreviewOverlay(previewRenderer, TimeSpan.FromSeconds(8), () => Shutdown(0));
+            return;
+        }
+
         if (options.Gallery)
         {
             Window gallery = UiGallery.CreateWindow();
@@ -98,8 +106,7 @@ public partial class App : Application
         _picker = new PickerWindow(_coordinator);
 
         _trayIcon = (TaskbarIcon)FindResource("TrayIcon");
-        _trayIcon.Icon = AppIcon.Tray(OverlayTheme.IsTaskbarLight());
-        Microsoft.Win32.SystemEvents.UserPreferenceChanged += (_, _) => Dispatcher.InvokeAsync(() => _trayIcon.Icon = AppIcon.Tray(OverlayTheme.IsTaskbarLight()));
+        _trayIcon.Icon = AppIcon.Tray();
         // Efficiency mode lowers process priority, which would hurt the overlay's show latency.
         _trayIcon.ForceCreate(enablesEfficiencyMode: false);
         _trayIcon.TrayLeftMouseUp += (_, _) => _picker.ShowEmpty();

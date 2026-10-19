@@ -33,3 +33,14 @@ SetCurrentProcessExplicitAppUserModelID
 ShellLink
 IShellLinkW
 IPersistFile
+SendMessage
+WM_NCACTIVATE
+GetDC
+ReleaseDC
+CreateCompatibleDC
+DeleteDC
+CreateCompatibleBitmap
+SelectObject
+BitBlt
+DeleteObject
+GetDIBits

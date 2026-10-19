@@ -34,3 +34,26 @@ Status: accepted, pending the owner's review of the look
 - Eight tiles overlapped (ring radius ignored tile count) → fixed in `OverlayModel`, with a unit test per tile count.
 - White text on a lightened accent had poor contrast in dark mode → `UISettings` accent shades and a contrast check.
 - The status bubble lost its background circle → fixed.
+
+## Addendum: glass style, acrylic fix, owner's icons (same day)
+
+- **Acrylic panel showed flat grey**: DWM draws system backdrops only for *active* windows, and the overlay is
+  never activated. Fix: send `WM_NCACTIVATE(TRUE)` after showing and swallow `WM_NCACTIVATE(FALSE)`; the frame looks
+  active, focus never moves. Verified with a desktop screenshot (`--preview-overlay=dwm`).
+- **New "Glass" style (now the default)**, modelled on the owner's reference: a translucent blue disc with a rim
+  highlight, a darker inner disc with a large icon and count badge, round glass bubbles with labels, and a bright
+  glowing bubble on hover.
+- **Round blur**: every Windows blur API blurs the whole window *rectangle*. Tried and rejected, each verified with
+  screenshots: DWM system backdrop + `SetWindowRgn` (region applied, backdrop ignores it), accent acrylic
+  (`SetWindowCompositionAttribute`) on a frame-extended window and on a layered window (both rectangular).
+  Adopted instead: capture the screen area behind the overlay just before it appears (GDI `BitBlt`, in memory only),
+  blur it on the CPU (3x downscale + three box-blur passes), and draw it inside the disc. The overlay doesn't move
+  while open, so a frozen backdrop is indistinguishable from live blur except over moving content (video). Warm
+  cost: about 24 ms capture + blur, 40 ms to show; the warm-up at startup runs one capture to pay JIT costs early.
+  When the capture fails, the disc uses its stronger no-blur tint.
+- **Icons are the owner's artwork**: `assets/icon-source/app.png` (neon, opaque black surround removed with a
+  rounded-rectangle mask) and `assets/icon-source/tray.png` (glossy, already transparent), turned into multi-size
+  .ico files with Magick.NET (Lanczos, light sharpening at 32 px and below). The tray uses the full-colour icon at
+  Windows' small-icon size; it no longer follows the taskbar theme.
+- **`--preview-overlay[=glass|layered|dwm]`** shows the real overlay window for 8 s, so DWM effects and the captured
+  backdrop can be screenshotted and reviewed.

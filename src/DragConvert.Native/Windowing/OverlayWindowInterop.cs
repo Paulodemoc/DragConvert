@@ -38,6 +38,17 @@ public static class OverlayWindowInterop
         PInvoke.SetWindowLong(handle, WINDOW_LONG_PTR_INDEX.GWL_EXSTYLE, exStyle);
     }
 
+    public const int WmNcActivate = 0x0086;
+
+    /// <summary>Pixel size Windows uses for small icons (tray, title bar) at the system scaling.</summary>
+    public static int SmallIconSize => Math.Max(16, PInvoke.GetSystemMetrics(SYSTEM_METRICS_INDEX.SM_CXSMICON));
+
+    /// <summary>
+    /// Marks the window frame active without activating the window. DWM draws system backdrops (acrylic, Mica) only
+    /// for active windows and falls back to flat grey otherwise; the overlay is never activated, so it fakes it.
+    /// </summary>
+    public static void ForceActiveFrame(nint hwnd) => PInvoke.SendMessage(new HWND(hwnd), PInvoke.WM_NCACTIVATE, new WPARAM(1), default);
+
     public static (int X, int Y) GetCursorPosition()
     {
         PInvoke.GetCursorPos(out var point);

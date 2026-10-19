@@ -104,24 +104,21 @@ internal static class UiGallery
             }
         }
 
-        foreach (int size in new[] { 16, 32, 256 })
+        // Glass looks the same in light and dark; rendered without the blur it gets on a real Windows 11 desktop.
+        foreach (var (name, setup) in States)
         {
-            string path = Path.Combine(directory, $"icon-app-{size}.png");
-            File.WriteAllBytes(path, AppIcon.EncodePng(AppIcon.Render(size, colored: true, Colors.White)));
+            FrameworkElement frame = Frame(ThemeVariant.Dark, setup, glass: true);
+            string path = Path.Combine(directory, $"glass-{name}.png");
+            File.WriteAllBytes(path, AppIcon.EncodePng(RenderElement(frame, scale: 2)));
             written.Add(path);
         }
 
-        foreach (bool light in new[] { true, false })
+        foreach (var (tray, size) in new[] { (false, 16), (false, 32), (false, 256), (true, 16), (true, 32) })
         {
-            string path = Path.Combine(directory, $"icon-tray-{(light ? "light" : "dark")}-taskbar.png");
-            var tray = new Border { Width = 64, Height = 64, Background = new SolidColorBrush(light ? Color.FromRgb(0xEE, 0xEE, 0xEE) : Color.FromRgb(0x20, 0x20, 0x20)), Child = new System.Windows.Controls.Image { Source = AppIcon.TrayPreview(light), Width = 32, Height = 32 } };
-            File.WriteAllBytes(path, AppIcon.EncodePng(RenderElement(tray, scale: 1)));
+            string path = Path.Combine(directory, $"icon-{(tray ? "tray" : "app")}-{size}.png");
+            File.WriteAllBytes(path, AppIcon.EncodePng(AppIcon.Frame(tray, size)));
             written.Add(path);
         }
-
-        string ico = Path.Combine(directory, "DragConvert.ico");
-        AppIcon.WriteIco(ico, 16, 20, 24, 32, 40, 48, 64, 256);
-        written.Add(ico);
 
         OverlayView.AnimationsOverride = null;
         return written;
@@ -134,11 +131,11 @@ internal static class UiGallery
         var panel = new WrapPanel { Margin = new Thickness(12) };
         foreach (var (name, setup) in States)
         {
-            foreach (ThemeVariant variant in new[] { ThemeVariant.Light, ThemeVariant.Dark })
+            foreach (var (label, variant, glass) in new[] { ("glass", ThemeVariant.Dark, true), ("ring, light", ThemeVariant.Light, false), ("ring, dark", ThemeVariant.Dark, false) })
             {
                 var stack = new StackPanel { Margin = new Thickness(6) };
-                stack.Children.Add(new TextBlock { Text = $"{name} ({variant})", Margin = new Thickness(0, 0, 0, 4) });
-                stack.Children.Add(Frame(variant, setup));
+                stack.Children.Add(new TextBlock { Text = $"{name} ({label})", Margin = new Thickness(0, 0, 0, 4) });
+                stack.Children.Add(Frame(variant, setup, glass));
                 panel.Children.Add(stack);
             }
         }
@@ -155,12 +152,37 @@ internal static class UiGallery
         return window;
     }
 
+    /// <summary>Shows the real overlay window (with its renderer and DWM effects) at screen centre with sample tiles.</summary>
+    public static void PreviewOverlay(OverlayRenderer renderer, TimeSpan duration, Action done)
+    {
+        // Same sequence as the tray app: create hidden, warm up, then show.
+        var window = new OverlayWindow(renderer);
+        window.Prepare();
+        window.WarmUp(() =>
+        {
+            var (x, y) = DragConvert.Native.Windowing.OverlayWindowInterop.GetCursorPosition();
+            DragConvert.Native.Windowing.ScreenRect work = DragConvert.Native.Windowing.OverlayWindowInterop.GetWorkArea(x, y);
+            long start = System.Diagnostics.Stopwatch.GetTimestamp();
+            window.ShowAt(work.Left + (work.Width / 2), work.Top + (work.Height / 2));
+            States.First(s => s.Name == "04-mixed-with-counts").Setup(window.View);
+            Serilog.Log.Information("Preview shown in {Ms:F1} ms after warm-up", System.Diagnostics.Stopwatch.GetElapsedTime(start).TotalMilliseconds);
+        });
+        var timer = new System.Windows.Threading.DispatcherTimer { Interval = duration };
+        timer.Tick += (_, _) =>
+        {
+            timer.Stop();
+            window.Close();
+            done();
+        };
+        timer.Start();
+    }
+
     private static OverlayTile T(string label, MediaCategory category, string? detail = null) => new(label, detail, category);
 
     /// <summary>The overlay on a stand-in desktop background for its theme.</summary>
-    private static Border Frame(ThemeVariant variant, Action<OverlayView> setup)
+    private static Border Frame(ThemeVariant variant, Action<OverlayView> setup, bool glass = false)
     {
-        var view = new OverlayView(OverlayTheme.For(variant));
+        OverlayView view = glass ? new GlassOverlayView() : new RingOverlayView(OverlayTheme.For(variant));
         setup(view);
         Brush desktop = variant switch
         {

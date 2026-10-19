@@ -35,6 +35,25 @@
     <FontFamily x:Key="Font.Small">Segoe UI Variable Small, Segoe UI</FontFamily>
     <FontFamily x:Key="Font.Icons">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
 
+    <!-- Glass style: brand blue regardless of light/dark, like the app icon -->
+    <sys:Double x:Key="Glass.BubbleSize">56</sys:Double>
+    <sys:Double x:Key="Glass.LabelHeight">30</sys:Double>
+    <sys:Double x:Key="Glass.InnerRadius">62</sys:Double>
+    <sys:Double x:Key="Glass.Gap">10</sys:Double>
+    <sys:Double x:Key="Glass.RimPadding">12</sys:Double>
+    <sys:Double x:Key="Glass.CenterGlyphSize">46</sys:Double>
+    <sys:Double x:Key="Glass.BubbleGlyphSize">22</sys:Double>
+    <sys:Double x:Key="Glass.HoverScale">1.08</sys:Double>
+    <!-- Tint alphas: lighter over real acrylic blur, stronger when there's no blur behind (Windows 10, snapshots) -->
+    <sys:Double x:Key="Glass.TintOverBlur">0.55</sys:Double>
+    <sys:Double x:Key="Glass.TintNoBlur">0.88</sys:Double>
+    <Color x:Key="Glass.Light">#FF6FAAFF</Color>
+    <Color x:Key="Glass.Mid">#FF2F72E6</Color>
+    <Color x:Key="Glass.Deep">#FF1648B8</Color>
+    <Color x:Key="Glass.Inner">#FF123C9C</Color>
+    <Color x:Key="Glass.Badge">#FF2B7BFF</Color>
+    <Color x:Key="Glass.HoverIcon">#FF1F5FE0</Color>
+
     <!-- Dark theme -->
     <Color x:Key="Dark.Plate">#D91C1C1C</Color>
     <Color x:Key="Dark.PlateBorder">#33FFFFFF</Color>
