@@ -66,7 +66,9 @@
     <sys:Double x:Key="Segments.SliceAlpha">0.72</sys:Double>
     <sys:Double x:Key="Segments.BaseFrost">0.18</sys:Double>
     <sys:Double x:Key="Segments.CenterAlpha">0.92</sys:Double>
-    <Color x:Key="Segments.Hover">#FFFF5A1F</Color>
+    <!-- Lavender picked by the owner; light, so text on it is dark (about 9:1 contrast) -->
+    <Color x:Key="Segments.Hover">#FFB1B9F9</Color>
+    <Color x:Key="Segments.HoverText">#FF1F1F1F</Color>
     <Color x:Key="Segments.Text">#FF1F1F1F</Color>
 
     <!-- Dark theme -->

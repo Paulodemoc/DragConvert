@@ -101,7 +101,7 @@ internal sealed class SegmentsOverlayView : OverlayView
         centerStack.Children.Add(_centerText);
         centerStack.Children.Add(_centerDetail);
 
-        _countText = new TextBlock { FontFamily = OverlayTheme.SmallFont, FontSize = 10, FontWeight = FontWeights.Bold, Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        _countText = new TextBlock { FontFamily = OverlayTheme.SmallFont, FontSize = 10, FontWeight = FontWeights.Bold, Foreground = new SolidColorBrush(Token("Segments.HoverText")), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
         _countBadge = new Border
         {
             MinWidth = 20,
@@ -444,7 +444,7 @@ internal sealed class SegmentsOverlayView : OverlayView
         slice.Fill = slice.Stroke = new SolidColorBrush(color);
         slice.Opacity = hovered ? 1 : OverlayTheme.Number("Segments.SliceAlpha");
         slice.Effect = hovered ? new DropShadowEffect { Color = Token("Segments.Hover"), BlurRadius = 14, ShadowDepth = 0, Opacity = 0.55 } : null;
-        TextElement.SetForeground(labels, new SolidColorBrush(hovered ? Colors.White : Token("Segments.Text")));
+        TextElement.SetForeground(labels, new SolidColorBrush(Token(hovered ? "Segments.HoverText" : "Segments.Text")));
 
         // The hovered slice moves a little outward along its angle.
         int count = _slices.Count;

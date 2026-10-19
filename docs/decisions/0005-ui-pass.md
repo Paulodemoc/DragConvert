@@ -78,7 +78,7 @@ Status: accepted, pending the owner's review of the look
   edge) and rounded corners, made by insetting each segment by the corner radius and stroking it with round joins in
   the fill colour. Element opacity (not brush alpha) keeps fill and stroke as one layer, so there's no darker seam.
 - Labels sit at mid-radius, upper case, sized to the slice's chord; multi-word tool names wrap. The hovered slice
-  turns orange (`Segments.Hover`), glows and moves outward a few pixels; the centre circle names it. The count badge
+  turns lavender (`Segments.Hover`, #B1B9F9, chosen by the owner; dark text on it), glows and moves outward a few pixels; the centre circle names it. The count badge
   sits inside the centre circle.
 - It uses the same frosted backdrop and brightness-aware darkening as Glass. Hit testing is by angle, as for the
   other styles.
