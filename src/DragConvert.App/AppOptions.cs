@@ -4,9 +4,9 @@ namespace DragConvert.App;
 
 /// <summary>
 /// Command line: file or folder paths (from Send To or a shortcut) plus flags: --smoke (start, then exit; for CI),
-/// --console (live log window), --renderer=layered|dwm (overrides the setting), --send-to (marks Send To launches),
+/// --console (live log window), --renderer=glass|layered (overrides the setting), --send-to (marks Send To launches),
 /// --gallery (UI gallery window), --snapshot[=dir] (render UI states to PNG and exit; default artifacts/ui),
-/// --preview-overlay[=layered|dwm] (show the real overlay window at screen centre for 8 s, for screenshots).
+/// --preview-overlay[=glass|layered] (show the real overlay window at screen centre for 8 s, for screenshots).
 /// </summary>
 internal sealed record AppOptions(bool Smoke, bool Console, OverlayRenderer? Renderer, IReadOnlyList<string> Paths, bool Gallery = false, string? SnapshotDirectory = null, OverlayRenderer? PreviewOverlay = null)
 {
@@ -39,7 +39,7 @@ internal sealed record AppOptions(bool Smoke, bool Console, OverlayRenderer? Ren
             {
                 preview = arg.Contains('=', StringComparison.Ordinal) && Enum.TryParse(arg[(arg.IndexOf('=', StringComparison.Ordinal) + 1)..], ignoreCase: true, out OverlayRenderer r)
                     ? r
-                    : OverlayRenderer.Layered;
+                    : OverlayRenderer.Glass;
             }
             else if (arg.StartsWith("--snapshot", StringComparison.OrdinalIgnoreCase))
             {

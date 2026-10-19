@@ -17,6 +17,7 @@ C# 14, .NET 10, WPF (Fluent theme), CsWin32. Solution in src/, tests in tests/.
 - Apps launched from an elevated shell are elevated, and Windows then blocks drops from Explorer: launch GUI test builds via tools/run-spike.cmd from Explorer.
 - Visual values (sizes, radii, colours, timings) belong in src/DragConvert.App/Theme/Tokens.xaml, not in code.
 - After UI changes, render snapshots and look at them before saying the UI is done; also run the --smoke check.
+- Rebuild BOTH Debug and Release before handing a build to the user (they often run the Debug exe).
 - Hooks and overlay can't be unit tested: keep docs/test-matrix.md as the manual checklist the user runs on a real desktop.
 
 ## Commands

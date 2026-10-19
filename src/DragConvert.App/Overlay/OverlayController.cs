@@ -30,7 +30,7 @@ internal sealed class OverlayController : IDisposable
 
     private readonly Dispatcher _dispatcher;
     private readonly ConversionCoordinator _coordinator;
-    private readonly OverlayWindow _overlay;
+    private OverlayWindow _overlay;
     private readonly MouseHookThread _hook;
     private readonly DispatcherTimer _poll;
     private readonly DispatcherTimer _dropWait;
@@ -52,9 +52,7 @@ internal sealed class OverlayController : IDisposable
         _coordinator = coordinator;
         Renderer = renderer;
         Chord = chord;
-        _overlay = new OverlayWindow(renderer);
-        _overlay.DragEntered += OnDragEntered;
-        _overlay.TileDropped += OnTileDropped;
+        _overlay = CreateOverlay(renderer);
         _hook = new MouseHookThread(OnHookSignal);
         _poll = new DispatcherTimer(PollInterval, DispatcherPriority.Input, (_, _) => Evaluate(Stopwatch.GetTimestamp(), fromHook: false), dispatcher);
         _poll.Stop();
@@ -62,7 +60,7 @@ internal sealed class OverlayController : IDisposable
         _dropWait.Stop();
     }
 
-    public OverlayRenderer Renderer { get; }
+    public OverlayRenderer Renderer { get; private set; }
 
     /// <summary>The trigger chord; <see cref="Modifiers.None"/> means the overlay never shows.</summary>
     public ModifierChord Chord { get; set; }
@@ -72,17 +70,7 @@ internal sealed class OverlayController : IDisposable
 
     public void Start()
     {
-        long prepareStart = Stopwatch.GetTimestamp();
-        _overlay.Prepare();
-        Logger.Information(
-            "Overlay created hidden in {Ms:F1} ms; renderer {Renderer}; backdrop applied {Backdrop}",
-            Stopwatch.GetElapsedTime(prepareStart).TotalMilliseconds,
-            Renderer,
-            _overlay.BackdropApplied);
-
-        long warmStart = Stopwatch.GetTimestamp();
-        _overlay.WarmUp(() => Logger.Information("Overlay warm-up render done in {Ms:F1} ms; {Memory}", Stopwatch.GetElapsedTime(warmStart).TotalMilliseconds, MemorySummary()));
-
+        PrepareOverlay();
         _hook.Start();
         if (_hook.IsInstalled)
         {
@@ -94,6 +82,27 @@ internal sealed class OverlayController : IDisposable
         }
     }
 
+    /// <summary>Switches the overlay style immediately: the window is rebuilt and warmed up again.</summary>
+    public void SwitchRenderer(OverlayRenderer renderer)
+    {
+        if (renderer == Renderer)
+        {
+            return;
+        }
+
+        _dropWait.Stop();
+        _visible = false;
+        _bubble++;
+        OverlayWindow old = _overlay;
+        old.DragEntered -= OnDragEntered;
+        old.TileDropped -= OnTileDropped;
+        old.Close();
+
+        Renderer = renderer;
+        _overlay = CreateOverlay(renderer);
+        PrepareOverlay();
+    }
+
     public void Dispose()
     {
         _poll.Stop();
@@ -102,6 +111,24 @@ internal sealed class OverlayController : IDisposable
         _dragCts?.Dispose();
         _hook.Dispose();
         _overlay.Close();
+    }
+
+    private OverlayWindow CreateOverlay(OverlayRenderer renderer)
+    {
+        var overlay = new OverlayWindow(renderer);
+        overlay.DragEntered += OnDragEntered;
+        overlay.TileDropped += OnTileDropped;
+        return overlay;
+    }
+
+    private void PrepareOverlay()
+    {
+        long prepareStart = Stopwatch.GetTimestamp();
+        _overlay.Prepare();
+        Logger.Information("Overlay created hidden in {Ms:F1} ms; style {Renderer}", Stopwatch.GetElapsedTime(prepareStart).TotalMilliseconds, Renderer);
+
+        long warmStart = Stopwatch.GetTimestamp();
+        _overlay.WarmUp(() => Logger.Information("Overlay warm-up render done in {Ms:F1} ms; {Memory}", Stopwatch.GetElapsedTime(warmStart).TotalMilliseconds, MemorySummary()));
     }
 
     private static string MemorySummary()

@@ -1,9 +1,7 @@
 using System.Runtime.InteropServices;
 using Windows.Win32;
 using Windows.Win32.Foundation;
-using Windows.Win32.Graphics.Dwm;
 using Windows.Win32.Graphics.Gdi;
-using Windows.Win32.UI.Controls;
 using Windows.Win32.UI.WindowsAndMessaging;
 
 namespace DragConvert.Native.Windowing;
@@ -38,16 +36,8 @@ public static class OverlayWindowInterop
         PInvoke.SetWindowLong(handle, WINDOW_LONG_PTR_INDEX.GWL_EXSTYLE, exStyle);
     }
 
-    public const int WmNcActivate = 0x0086;
-
     /// <summary>Pixel size Windows uses for small icons (tray, title bar) at the system scaling.</summary>
     public static int SmallIconSize => Math.Max(16, PInvoke.GetSystemMetrics(SYSTEM_METRICS_INDEX.SM_CXSMICON));
-
-    /// <summary>
-    /// Marks the window frame active without activating the window. DWM draws system backdrops (acrylic, Mica) only
-    /// for active windows and falls back to flat grey otherwise; the overlay is never activated, so it fakes it.
-    /// </summary>
-    public static void ForceActiveFrame(nint hwnd) => PInvoke.SendMessage(new HWND(hwnd), PInvoke.WM_NCACTIVATE, new WPARAM(1), default);
 
     public static (int X, int Y) GetCursorPosition()
     {
@@ -98,28 +88,6 @@ public static class OverlayWindowInterop
     {
         HWND window = PInvoke.FindWindow("SysDragImage", null);
         return !window.IsNull && PInvoke.IsWindowVisible(window);
-    }
-
-    /// <summary>
-    /// Applies Windows 11 rounded corners, dark mode and a transient (acrylic) system backdrop.
-    /// Returns false where the backdrop is unsupported (Windows 10, older Windows 11 builds).
-    /// </summary>
-    public static unsafe bool TryApplySystemBackdrop(nint hwnd, bool dark)
-    {
-        var handle = new HWND(hwnd);
-
-        var corner = DWM_WINDOW_CORNER_PREFERENCE.DWMWCP_ROUND;
-        PInvoke.DwmSetWindowAttribute(handle, DWMWINDOWATTRIBUTE.DWMWA_WINDOW_CORNER_PREFERENCE, &corner, sizeof(DWM_WINDOW_CORNER_PREFERENCE));
-
-        BOOL useDark = dark;
-        PInvoke.DwmSetWindowAttribute(handle, DWMWINDOWATTRIBUTE.DWMWA_USE_IMMERSIVE_DARK_MODE, &useDark, (uint)sizeof(BOOL));
-
-        var margins = new MARGINS { cxLeftWidth = -1, cxRightWidth = -1, cyTopHeight = -1, cyBottomHeight = -1 };
-        PInvoke.DwmExtendFrameIntoClientArea(handle, in margins);
-
-        var backdrop = DWM_SYSTEMBACKDROP_TYPE.DWMSBT_TRANSIENTWINDOW;
-        HRESULT result = PInvoke.DwmSetWindowAttribute(handle, DWMWINDOWATTRIBUTE.DWMWA_SYSTEMBACKDROP_TYPE, &backdrop, sizeof(DWM_SYSTEMBACKDROP_TYPE));
-        return result.Succeeded;
     }
 
     public static bool AllocateConsole() => PInvoke.AllocConsole();

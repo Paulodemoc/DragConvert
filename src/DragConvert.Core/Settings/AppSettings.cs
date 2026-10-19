@@ -26,7 +26,7 @@ public sealed record AppSettings
 
     public bool SendToMenu { get; init; } = true;
 
-    /// <summary>"glass", "layered" (ring) or "dwm" (acrylic panel); applied at the next start.</summary>
+    /// <summary>Overlay style: "glass" or "layered" (ring). Applied immediately when changed.</summary>
     public string Renderer { get; init; } = "glass";
 
     /// <summary>Folder outputs go to, or null for "beside each original".</summary>

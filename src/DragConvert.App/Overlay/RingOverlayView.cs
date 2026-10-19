@@ -19,7 +19,6 @@ namespace DragConvert.App.Overlay;
 internal sealed class RingOverlayView : OverlayView
 {
     private readonly OverlayTheme _theme;
-    private readonly bool _showPlate;
     private readonly double _outer;
     private readonly double _platePadding;
     private readonly Canvas _ring = new();
@@ -38,10 +37,9 @@ internal sealed class RingOverlayView : OverlayView
     private int _hovered = -1;
     private string _summary = string.Empty;
 
-    public RingOverlayView(OverlayTheme theme, bool showPlate = true)
+    public RingOverlayView(OverlayTheme theme)
     {
         _theme = theme;
-        _showPlate = showPlate;
         _platePadding = OverlayTheme.Number("Overlay.PlatePadding");
         _outer = CreateModel(OverlayModel.MaxTiles).OuterRadius;
 
@@ -60,8 +58,8 @@ internal sealed class RingOverlayView : OverlayView
         {
             Width = Diameter,
             Height = Diameter,
-            Fill = showPlate ? theme.Plate : new SolidColorBrush(Color.FromArgb(1, 0, 0, 0)),
-            Stroke = showPlate ? theme.PlateBorder : null,
+            Fill = theme.Plate,
+            Stroke = theme.PlateBorder,
             StrokeThickness = 1,
         };
         _ring.Children.Add(_plate);

@@ -14,8 +14,9 @@ using DragConvert.Core.Overlay;
 namespace DragConvert.App.Overlay;
 
 /// <summary>
-/// The "Glass" style: a translucent blue disc with a rim highlight, a darker inner disc holding a large icon of what's
-/// being dragged, and round glass bubbles with labels around it; the hovered bubble turns bright and glows.
+/// The "Glass" style: a clear frosted disc with a rim highlight, an inner disc holding a large icon of what's being
+/// dragged, and round glass bubbles with labels around it; the hovered bubble turns bright and glows. No colour of its
+/// own: a neutral darkening, scaled to how bright the backdrop is, keeps the white text readable.
 /// Behind the tint sits a blurred copy of the screen area under the overlay, captured just before it appears: DWM's
 /// blur only comes as a rectangle, so the frosted look is done here to keep the disc perfectly round.
 /// </summary>
@@ -25,7 +26,7 @@ internal sealed class GlassOverlayView : OverlayView
     private readonly double _labelHeight;
     private readonly double _innerRadius;
     private readonly double _gap;
-    private readonly double _tintOverBlur;
+    private readonly Ellipse _scrim;
     private readonly Image _backdrop = new() { Stretch = Stretch.None, IsHitTestVisible = false };
     private readonly Ellipse _disc;
     private readonly double _radius;
@@ -53,8 +54,8 @@ internal sealed class GlassOverlayView : OverlayView
         _labelHeight = OverlayTheme.Number("Glass.LabelHeight");
         _innerRadius = OverlayTheme.Number("Glass.InnerRadius");
         _gap = OverlayTheme.Number("Glass.Gap");
-        double tint = OverlayTheme.Number("Glass.TintNoBlur");
-        _tintOverBlur = OverlayTheme.Number("Glass.TintOverBlur") / tint;
+        double frostHighlight = OverlayTheme.Number("Glass.FrostHighlight");
+        double frostEdge = OverlayTheme.Number("Glass.FrostEdge");
 
         OverlayModel widest = CreateModel(OverlayModel.MaxTiles);
         _radius = widest.RingRadius + (TileBox / 2) + OverlayTheme.Number("Glass.RimPadding");
@@ -72,26 +73,29 @@ internal sealed class GlassOverlayView : OverlayView
         _backdrop.Visibility = Visibility.Collapsed;
         _ring.Children.Add(_backdrop);
 
-        // Outer glass disc: radial blue, brighter towards the top-left like light hitting glass.
+        // Neutral darkening, set per show from the backdrop's brightness.
+        _scrim = new Ellipse { Width = Width, Height = Height, Fill = Brushes.Black, Opacity = OverlayTheme.Number("Glass.ScrimNoBackdrop") };
+        _ring.Children.Add(_scrim);
+
+        // Frost: a faint white sheen, brighter towards the top-left like light hitting glass, and a bright rim.
         _disc = new Ellipse
         {
             Width = Width,
             Height = Height,
             Fill = new RadialGradientBrush
             {
-                GradientOrigin = new Point(0.4, 0.3),
+                GradientOrigin = new Point(0.35, 0.25),
                 Center = new Point(0.5, 0.45),
                 RadiusX = 0.75,
                 RadiusY = 0.75,
                 GradientStops =
                 {
-                    new GradientStop(WithAlpha(Token("Glass.Light"), tint * 0.85), 0),
-                    new GradientStop(WithAlpha(Token("Glass.Mid"), tint), 0.6),
-                    new GradientStop(WithAlpha(Token("Glass.Deep"), tint * 1.05), 1),
+                    new GradientStop(WithAlpha(Colors.White, frostHighlight), 0),
+                    new GradientStop(WithAlpha(Colors.White, frostEdge), 1),
                 },
             },
-            Stroke = Rim(0.85, 0.25),
-            StrokeThickness = 2,
+            Stroke = Rim(0.85, 0.3),
+            StrokeThickness = 1.6,
         };
         _ring.Children.Add(_disc);
 
@@ -100,23 +104,20 @@ internal sealed class GlassOverlayView : OverlayView
         {
             Width = Width - 8,
             Height = Height - 8,
-            Fill = new LinearGradientBrush(Color.FromArgb(46, 255, 255, 255), Color.FromArgb(0, 255, 255, 255), new Point(0.5, 0), new Point(0.5, 0.55)),
+            Fill = new LinearGradientBrush(Color.FromArgb(30, 255, 255, 255), Color.FromArgb(0, 255, 255, 255), new Point(0.5, 0), new Point(0.5, 0.55)),
             IsHitTestVisible = false,
         });
         SetLeft(_ring.Children[^1], 4);
         SetTop(_ring.Children[^1], 4);
 
-        // Inner disc: deeper blue with its own faint rim.
+        // Inner disc: a little darker, with its own faint rim.
         double inner = 2 * _innerRadius;
         var innerDisc = new Ellipse
         {
             Width = inner,
             Height = inner,
-            Fill = new RadialGradientBrush(WithAlpha(Token("Glass.Mid"), tint * 0.7), WithAlpha(Token("Glass.Inner"), Math.Min(1, tint * 1.1)))
-            {
-                GradientOrigin = new Point(0.5, 0.35),
-            },
-            Stroke = Rim(0.45, 0.12),
+            Fill = new RadialGradientBrush(Color.FromArgb(18, 255, 255, 255), Color.FromArgb(40, 0, 0, 0)) { GradientOrigin = new Point(0.5, 0.3) },
+            Stroke = Rim(0.55, 0.15),
             StrokeThickness = 1.2,
         };
         Place(innerDisc, Center, Center);
@@ -127,16 +128,16 @@ internal sealed class GlassOverlayView : OverlayView
         {
             FontFamily = OverlayTheme.IconFont,
             FontSize = OverlayTheme.Number("Glass.CenterGlyphSize"),
-            Foreground = new LinearGradientBrush(Colors.White, Color.FromRgb(0xC8, 0xD8, 0xF6), 90),
+            Foreground = new LinearGradientBrush(Colors.White, Color.FromRgb(0xE4, 0xE4, 0xE8), 90),
             HorizontalAlignment = HorizontalAlignment.Center,
-            Effect = new DropShadowEffect { Color = Color.FromRgb(0x06, 0x1C, 0x55), BlurRadius = 10, ShadowDepth = 2, Opacity = 0.5 },
+            Effect = new DropShadowEffect { Color = Colors.Black, BlurRadius = 10, ShadowDepth = 1, Opacity = 0.45 },
         };
         _countText = new TextBlock
         {
             FontFamily = OverlayTheme.SmallFont,
             FontSize = 11,
             FontWeight = FontWeights.Bold,
-            Foreground = Brushes.White,
+            Foreground = new SolidColorBrush(Token("Glass.HoverIcon")),
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
         };
@@ -146,9 +147,8 @@ internal sealed class GlassOverlayView : OverlayView
             Height = 22,
             Padding = new Thickness(5, 0, 5, 0),
             CornerRadius = new CornerRadius(11),
-            Background = new SolidColorBrush(Token("Glass.Badge")),
-            BorderBrush = Brushes.White,
-            BorderThickness = new Thickness(2),
+            Background = Brushes.White,
+            Effect = new DropShadowEffect { Color = Colors.Black, BlurRadius = 6, ShadowDepth = 0, Opacity = 0.4 },
             Child = _countText,
             HorizontalAlignment = HorizontalAlignment.Right,
             VerticalAlignment = VerticalAlignment.Bottom,
@@ -163,7 +163,8 @@ internal sealed class GlassOverlayView : OverlayView
         {
             FontFamily = OverlayTheme.SmallFont,
             FontSize = 11,
-            Foreground = new SolidColorBrush(Color.FromArgb(230, 255, 255, 255)),
+            Foreground = Brushes.White,
+            Effect = new DropShadowEffect { Color = Colors.Black, BlurRadius = 5, ShadowDepth = 0, Opacity = 0.7 },
             TextAlignment = TextAlignment.Center,
             TextWrapping = TextWrapping.Wrap,
             TextTrimming = TextTrimming.CharacterEllipsis,
@@ -219,12 +220,14 @@ internal sealed class GlassOverlayView : OverlayView
 
     public override bool WantsBackdrop => true;
 
-    public override void SetBackdrop(BitmapSource? snapshot)
+    public override void SetBackdrop(BitmapSource? snapshot, double brightness)
     {
-        // With a frosted backdrop the tint can be lighter; without one it stays strong enough to read on anything.
+        // Over a dark backdrop the glass stays nearly clear; over a bright one it darkens just enough for white text.
         _backdrop.Source = snapshot;
         _backdrop.Visibility = snapshot is null ? Visibility.Collapsed : Visibility.Visible;
-        _disc.Opacity = snapshot is null ? 1 : _tintOverBlur;
+        _scrim.Opacity = snapshot is null
+            ? OverlayTheme.Number("Glass.ScrimNoBackdrop")
+            : OverlayTheme.Number("Glass.ScrimBase") + (OverlayTheme.Number("Glass.ScrimPerBrightness") * Math.Clamp(brightness, 0, 1));
     }
 
     private double Center => _radius;
@@ -440,7 +443,7 @@ internal sealed class GlassOverlayView : OverlayView
         bubbleGrid.Children.Add(glyph);
 
         var labels = new StackPanel { VerticalAlignment = VerticalAlignment.Bottom, HorizontalAlignment = HorizontalAlignment.Center };
-        var labelShadow = new DropShadowEffect { Color = Color.FromRgb(0x05, 0x18, 0x48), BlurRadius = 6, ShadowDepth = 0, Opacity = 0.75 };
+        var labelShadow = new DropShadowEffect { Color = Colors.Black, BlurRadius = 6, ShadowDepth = 0, Opacity = 0.75 };
         labels.Children.Add(new TextBlock
         {
             Text = tile.Label,
@@ -478,8 +481,8 @@ internal sealed class GlassOverlayView : OverlayView
     private void StyleTile((Grid Root, Ellipse Bubble, TextBlock Glyph) view, bool hovered, bool animate = true)
     {
         view.Bubble.Fill = hovered
-            ? new RadialGradientBrush(Colors.White, Color.FromRgb(0xDC, 0xE8, 0xFF)) { GradientOrigin = new Point(0.4, 0.3) }
-            : new LinearGradientBrush(Color.FromArgb(70, 255, 255, 255), Color.FromArgb(28, 255, 255, 255), 90);
+            ? new RadialGradientBrush(Colors.White, Color.FromRgb(0xE6, 0xE6, 0xEA)) { GradientOrigin = new Point(0.4, 0.3) }
+            : new LinearGradientBrush(Color.FromArgb(64, 255, 255, 255), Color.FromArgb(24, 255, 255, 255), 90);
         view.Bubble.Stroke = hovered ? Brushes.White : Rim(0.7, 0.25);
         view.Glyph.Foreground = hovered ? new SolidColorBrush(Token("Glass.HoverIcon")) : Brushes.White;
         var bubbleGrid = (Grid)view.Root.Children[0];

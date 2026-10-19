@@ -24,9 +24,9 @@ internal abstract class OverlayView : Canvas
 
     /// <summary>
     /// The screen area behind the overlay, captured just before it appears and already blurred, exactly the size of the
-    /// view; null when the capture failed. Only called when <see cref="WantsBackdrop"/>.
+    /// view, with its average brightness (0 to 1); null when the capture failed. Only called when <see cref="WantsBackdrop"/>.
     /// </summary>
-    public virtual void SetBackdrop(System.Windows.Media.Imaging.BitmapSource? snapshot)
+    public virtual void SetBackdrop(System.Windows.Media.Imaging.BitmapSource? snapshot, double brightness)
     {
     }
 

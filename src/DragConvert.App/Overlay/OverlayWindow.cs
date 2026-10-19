@@ -4,7 +4,6 @@ using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using System.Windows.Shell;
 using System.Windows.Threading;
 using DragConvert.App.Theme;
 using DragConvert.Core.Conversion;
@@ -16,13 +15,10 @@ namespace DragConvert.App.Overlay;
 
 public enum OverlayRenderer
 {
-    /// <summary>Per-pixel transparent window (AllowsTransparency): a true round plate.</summary>
+    /// <summary>"Ring": a themed round plate with square tiles.</summary>
     Layered,
 
-    /// <summary>Opaque borderless window with a DWM system backdrop (acrylic) and rounded corners.</summary>
-    Dwm,
-
-    /// <summary>Blue glass disc with round bubbles; acrylic blur clipped to the disc on Windows 11.</summary>
+    /// <summary>"Glass": a clear frosted disc (blurred copy of what's behind it) with round bubbles.</summary>
     Glass,
 }
 
@@ -44,19 +40,16 @@ internal sealed class OverlayWindow : Window
 
     private readonly OverlayRenderer _renderer;
     private readonly OverlayTheme _theme;
-    private readonly bool _useBackdrop;
     private (int X, int Y) _anchor;
     private DragPayload? _payload;
     private int _generation;
+    private bool _closed;
 
     public OverlayWindow(OverlayRenderer renderer)
     {
         _renderer = renderer;
         _theme = OverlayTheme.Current();
-        _useBackdrop = renderer == OverlayRenderer.Dwm;
-        View = renderer == OverlayRenderer.Glass
-            ? new GlassOverlayView()
-            : new RingOverlayView(_theme, showPlate: renderer == OverlayRenderer.Layered);
+        View = renderer == OverlayRenderer.Glass ? new GlassOverlayView() : new RingOverlayView(_theme);
 
         Width = View.Width;
         Height = View.Height;
@@ -69,20 +62,8 @@ internal sealed class OverlayWindow : Window
         Title = "DragConvert overlay";
         Background = Brushes.Transparent;
 
-        if (!_useBackdrop)
-        {
-            AllowsTransparency = true;
-        }
-        else
-        {
-            WindowChrome.SetWindowChrome(this, new WindowChrome
-            {
-                CaptionHeight = 0,
-                GlassFrameThickness = new Thickness(-1),
-                ResizeBorderThickness = new Thickness(0),
-                UseAeroCaptionButtons = false,
-            });
-        }
+        // Per-pixel transparency: the round shapes are the window; outside them, clicks and drops pass through.
+        AllowsTransparency = true;
 
         Content = View;
         SourceInitialized += OnSourceInitialized;
@@ -98,8 +79,6 @@ internal sealed class OverlayWindow : Window
 
     public nint Handle { get; private set; }
 
-    public bool BackdropApplied { get; private set; }
-
     /// <summary>Creates the HWND without showing the window, so the first real show only moves and shows it.</summary>
     public void Prepare() => new WindowInteropHelper(this).EnsureHandle();
 
@@ -112,7 +91,7 @@ internal sealed class OverlayWindow : Window
 
         // Run one backdrop capture and blur now, so the first real show doesn't pay for JIT and thread-pool start-up.
         CaptureBackdrop(new ScreenRect(0, 0, (int)Width, (int)Height));
-        View.SetBackdrop(null);
+        View.SetBackdrop(null, 0);
         Show();
         Dispatcher.BeginInvoke(
             () =>
@@ -139,11 +118,6 @@ internal sealed class OverlayWindow : Window
             Show();
         }
 
-        if (BackdropApplied)
-        {
-            OverlayWindowInterop.ForceActiveFrame(Handle);
-        }
-
         View.AnimateIn();
     }
 
@@ -160,12 +134,19 @@ internal sealed class OverlayWindow : Window
         int generation = _generation;
         View.AnimateOut(() =>
         {
-            if (generation == _generation)
+            // A newer show wins, and a window closed meanwhile (style switch) is left alone.
+            if (generation == _generation && !_closed)
             {
                 Hide();
                 View.Reset();
             }
         });
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        _closed = true;
+        base.OnClosed(e);
     }
 
     protected override void OnDpiChanged(DpiScale oldDpi, DpiScale newDpi)
@@ -275,38 +256,6 @@ internal sealed class OverlayWindow : Window
         Handle = new WindowInteropHelper(this).Handle;
         OverlayWindowInterop.ApplyNoActivateToolWindow(Handle);
 
-        if (_useBackdrop)
-        {
-            if (HwndSource.FromHwnd(Handle) is { CompositionTarget: { } target })
-            {
-                target.BackgroundColor = Colors.Transparent;
-            }
-
-            BackdropApplied = OverlayWindowInterop.TryApplySystemBackdrop(Handle, _theme.Variant == ThemeVariant.Dark);
-            if (BackdropApplied)
-            {
-                // Keep the frame "active" so DWM renders the acrylic instead of its inactive grey fallback.
-                HwndSource.FromHwnd(Handle)?.AddHook(KeepFrameActive);
-                OverlayWindowInterop.ForceActiveFrame(Handle);
-            }
-            if (!BackdropApplied)
-            {
-                // Windows 10 or older Windows 11: the themed plate colour as a solid panel instead of acrylic.
-                View.Background = _theme.Plate;
-            }
-        }
-    }
-
-    private static nint KeepFrameActive(nint hwnd, int msg, nint wParam, nint lParam, ref bool handled)
-    {
-        if (msg == OverlayWindowInterop.WmNcActivate && wParam == 0)
-        {
-            // Swallow "deactivate" so the backdrop never drops to its inactive fallback.
-            handled = true;
-            return 1;
-        }
-
-        return 0;
     }
 
     /// <summary>
@@ -330,13 +279,13 @@ internal sealed class OverlayWindow : Window
         ScreenPixels? pixels = ScreenCapture.Capture(area);
         if (pixels is null)
         {
-            View.SetBackdrop(null);
+            View.SetBackdrop(null, 0);
             return;
         }
 
-        BitmapSource bitmap = FrostedBackdrop.Create(pixels.Bgra, pixels.Width, pixels.Height, margin, sigma: 9 * scale, dpi: 96 * scale);
-        View.SetBackdrop(bitmap);
-        Logger.Debug("Backdrop captured {Width}x{Height} in {Ms:F1} ms", pixels.Width, pixels.Height, System.Diagnostics.Stopwatch.GetElapsedTime(start).TotalMilliseconds);
+        var (bitmap, brightness) = FrostedBackdrop.Create(pixels.Bgra, pixels.Width, pixels.Height, margin, sigma: OverlayTheme.Number("Glass.BlurSigma") * scale, dpi: 96 * scale);
+        View.SetBackdrop(bitmap, brightness);
+        Logger.Debug("Backdrop captured {Width}x{Height} in {Ms:F1} ms, brightness {Brightness:F2}", pixels.Width, pixels.Height, System.Diagnostics.Stopwatch.GetElapsedTime(start).TotalMilliseconds, brightness);
     }
 
     private void UpdateHover(DragEventArgs e)

@@ -57,3 +57,16 @@ Status: accepted, pending the owner's review of the look
   Windows' small-icon size; it no longer follows the taskbar theme.
 - **`--preview-overlay[=glass|layered|dwm]`** shows the real overlay window for 8 s, so DWM effects and the captured
   backdrop can be screenshotted and reviewed.
+
+## Addendum 2: neutral glass, acrylic panel removed, live style switching
+
+- **Glass is now neutral** (the owner wanted transparency without the blue): the blurred backdrop, then a black
+  layer whose opacity follows the backdrop's measured brightness (0.06 over black up to about 0.5 over white, so white
+  text stays readable), then a faint white frost and white rims. The hovered bubble and the count badge are white with
+  dark content. All values are `Glass.*` tokens.
+- **Acrylic panel style removed.** Even when the WM_NCACTIVATE fix works, DWM acrylic is a tinted rectangle that reads
+  as flat grey over dark windows, which isn't what the owner wants. Settings holding the old "dwm" value fall back to
+  Glass. Removed with it: WindowChrome, the system backdrop call and the fake-active frame.
+- **Style changes apply immediately**: the controller closes the overlay window and builds and warms up a new one.
+- The owner's report of "glass still shows a rectangle" came from an outdated Debug build (only Release had been
+  rebuilt). Both configurations are now rebuilt after changes.

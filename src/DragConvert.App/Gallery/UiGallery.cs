@@ -104,13 +104,16 @@ internal static class UiGallery
             }
         }
 
-        // Glass looks the same in light and dark; rendered without the blur it gets on a real Windows 11 desktop.
-        foreach (var (name, setup) in States)
+        // Glass over a bright and a dark stand-in wallpaper, blurred by the same code the app uses on the real screen.
+        foreach (ThemeVariant variant in new[] { ThemeVariant.Light, ThemeVariant.Dark })
         {
-            FrameworkElement frame = Frame(ThemeVariant.Dark, setup, glass: true);
-            string path = Path.Combine(directory, $"glass-{name}.png");
-            File.WriteAllBytes(path, AppIcon.EncodePng(RenderElement(frame, scale: 2)));
-            written.Add(path);
+            foreach (var (name, setup) in States)
+            {
+                FrameworkElement frame = Frame(variant, setup, glass: true);
+                string path = Path.Combine(directory, $"glass-{variant.ToString().ToLowerInvariant()}-{name}.png");
+                File.WriteAllBytes(path, AppIcon.EncodePng(RenderElement(frame, scale: 2)));
+                written.Add(path);
+            }
         }
 
         foreach (var (tray, size) in new[] { (false, 16), (false, 32), (false, 256), (true, 16), (true, 32) })
@@ -184,13 +187,48 @@ internal static class UiGallery
     {
         OverlayView view = glass ? new GlassOverlayView() : new RingOverlayView(OverlayTheme.For(variant));
         setup(view);
-        Brush desktop = variant switch
+        Brush desktop = Wallpaper(variant, glass);
+        if (view.WantsBackdrop)
+        {
+            // What the real overlay would capture: the wallpaper under the view, blurred.
+            var under = new Border { Width = view.Width + 32, Height = view.Height + 32, Background = desktop };
+            BitmapSource shot = RenderElement(under, scale: 1);
+            byte[] pixels = new byte[shot.PixelWidth * shot.PixelHeight * 4];
+            shot.CopyPixels(pixels, shot.PixelWidth * 4, 0);
+            var (blurred, brightness) = FrostedBackdrop.Create(pixels, shot.PixelWidth, shot.PixelHeight, 16, OverlayTheme.Number("Glass.BlurSigma"), 96);
+            view.SetBackdrop(blurred, brightness);
+        }
+
+        return new Border { Background = desktop, Padding = new Thickness(16), Child = view };
+    }
+
+    /// <summary>A stand-in desktop; for glass, a busy one so the frosting shows.</summary>
+    private static Brush Wallpaper(ThemeVariant variant, bool busy)
+    {
+        Brush gradient = variant switch
         {
             ThemeVariant.Dark => new LinearGradientBrush(Color.FromRgb(0x1B, 0x26, 0x38), Color.FromRgb(0x3A, 0x24, 0x4A), 45),
             ThemeVariant.Light => new LinearGradientBrush(Color.FromRgb(0xC9, 0xD8, 0xEA), Color.FromRgb(0xEA, 0xD9, 0xE8), 45),
             _ => SystemColors.DesktopBrush,
         };
-        return new Border { Background = desktop, Padding = new Thickness(16), Child = view };
+        if (!busy)
+        {
+            return gradient;
+        }
+
+        var drawing = new DrawingGroup();
+        using (DrawingContext dc = drawing.Open())
+        {
+            dc.DrawRectangle(gradient, null, new Rect(0, 0, 420, 420));
+            bool dark = variant == ThemeVariant.Dark;
+            dc.DrawEllipse(new SolidColorBrush(dark ? Color.FromRgb(0x2E, 0x6B, 0xD9) : Color.FromRgb(0xFF, 0xB3, 0x47)), null, new Point(90, 110), 70, 70);
+            dc.DrawEllipse(new SolidColorBrush(dark ? Color.FromRgb(0xD9, 0x4E, 0x8F) : Color.FromRgb(0x4F, 0xA8, 0xFF)), null, new Point(320, 300), 90, 90);
+            dc.DrawRectangle(new SolidColorBrush(dark ? Color.FromRgb(0x3F, 0xB5, 0x8A) : Color.FromRgb(0x6A, 0xD1, 0x9A)), null, new Rect(230, 40, 150, 70));
+            var text = new FormattedText("Documents  Photos  Music", System.Globalization.CultureInfo.InvariantCulture, FlowDirection.LeftToRight, new Typeface("Segoe UI"), 26, dark ? Brushes.White : Brushes.Black, 1);
+            dc.DrawText(text, new Point(30, 200));
+        }
+
+        return new DrawingBrush(drawing) { Stretch = Stretch.UniformToFill, TileMode = TileMode.None };
     }
 
     private static BitmapSource RenderElement(FrameworkElement element, double scale)

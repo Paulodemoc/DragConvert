@@ -87,7 +87,7 @@ public partial class App : Application
         ConfigureLogging(options.Console);
         DispatcherUnhandledException += (_, args) => Log.Fatal(args.Exception, "Unhandled exception on the UI thread");
         _settings = _settingsStore.Load();
-        OverlayRenderer renderer = options.Renderer ?? (Enum.TryParse(_settings.Renderer, ignoreCase: true, out OverlayRenderer r) ? r : OverlayRenderer.Layered);
+        OverlayRenderer renderer = options.Renderer ?? RendererFor(_settings);
         Log.Information("DragConvert starting; args {Args}; renderer {Renderer}; settings {@Settings}", e.Args, renderer, _settings);
 
         _notifications = new NotificationService(Dispatcher);
@@ -157,6 +157,10 @@ public partial class App : Application
 
         base.OnExit(e);
     }
+
+    /// <summary>The overlay style from settings; unknown values (such as the retired "dwm") fall back to Glass.</summary>
+    private static OverlayRenderer RendererFor(AppSettings settings) =>
+        Enum.TryParse(settings.Renderer, ignoreCase: true, out OverlayRenderer r) && Enum.IsDefined(r) ? r : OverlayRenderer.Glass;
 
     private static ModifierChord ChordFor(AppSettings settings) => ModifierChord.Default with { Trigger = settings.Trigger };
 
@@ -231,6 +235,7 @@ public partial class App : Application
         if (_overlay is not null)
         {
             _overlay.Chord = ChordFor(settings);
+            _overlay.SwitchRenderer(RendererFor(settings));
         }
 
         if (shellChanged)

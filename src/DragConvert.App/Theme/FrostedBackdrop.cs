@@ -12,7 +12,8 @@ internal static class FrostedBackdrop
     /// <param name="bgra">32-bit BGRA pixels, top row first.</param>
     /// <param name="margin">Pixels captured beyond the visible area on each side; cropped after blurring.</param>
     /// <param name="sigma">Gaussian-equivalent blur strength in pixels.</param>
-    public static BitmapSource Create(byte[] bgra, int width, int height, int margin, double sigma, double dpi)
+    /// <returns>The blurred image and its average brightness (0 black to 1 white).</returns>
+    public static (BitmapSource Image, double Brightness) Create(byte[] bgra, int width, int height, int margin, double sigma, double dpi)
     {
         // The result is blurred anyway: shrink first (block average), blur the small image, let WPF scale it back up.
         const int Factor = 3;
@@ -36,9 +37,15 @@ internal static class FrostedBackdrop
             Buffer.BlockCopy(work, (((y + margin) * width) + margin) * 4, cropped, y * outWidth * 4, outWidth * 4);
         }
 
+        double luminance = 0;
+        for (int i = 0; i < cropped.Length; i += 4)
+        {
+            luminance += (0.0722 * cropped[i]) + (0.7152 * cropped[i + 1]) + (0.2126 * cropped[i + 2]);
+        }
+
         var bitmap = BitmapSource.Create(outWidth, outHeight, dpi, dpi, PixelFormats.Bgra32, null, cropped, outWidth * 4);
         bitmap.Freeze();
-        return bitmap;
+        return (bitmap, luminance / (255.0 * outWidth * outHeight));
     }
 
     private static byte[] Downscale(byte[] source, int width, int height, int factor, out int newWidth, out int newHeight)

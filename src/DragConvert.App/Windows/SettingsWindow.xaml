@@ -17,11 +17,10 @@
             <ComboBoxItem Content="Shift + Alt" Tag="Shift, Alt" />
             <ComboBoxItem Content="Off (tray window and Send To only)" Tag="None" />
         </ComboBox>
-        <TextBlock Text="Overlay style (applies after restarting DragConvert):" TextWrapping="Wrap" Margin="0,4,0,4" />
+        <TextBlock Text="Overlay style:" TextWrapping="Wrap" Margin="0,4,0,4" />
         <ComboBox x:Name="RendererBox" SelectionChanged="OnChanged" Margin="0,0,0,16" AutomationProperties.Name="Overlay style">
             <ComboBoxItem Content="Glass" Tag="glass" />
             <ComboBoxItem Content="Ring" Tag="layered" />
-            <ComboBoxItem Content="Acrylic panel" Tag="dwm" />
         </ComboBox>
 
         <TextBlock Text="Output" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,8" />

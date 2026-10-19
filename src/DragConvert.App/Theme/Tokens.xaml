@@ -35,7 +35,7 @@
     <FontFamily x:Key="Font.Small">Segoe UI Variable Small, Segoe UI</FontFamily>
     <FontFamily x:Key="Font.Icons">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
 
-    <!-- Glass style: brand blue regardless of light/dark, like the app icon -->
+    <!-- Glass style: clear frosted glass over a blurred copy of what's behind it -->
     <sys:Double x:Key="Glass.BubbleSize">56</sys:Double>
     <sys:Double x:Key="Glass.LabelHeight">30</sys:Double>
     <sys:Double x:Key="Glass.InnerRadius">62</sys:Double>
@@ -44,15 +44,17 @@
     <sys:Double x:Key="Glass.CenterGlyphSize">46</sys:Double>
     <sys:Double x:Key="Glass.BubbleGlyphSize">22</sys:Double>
     <sys:Double x:Key="Glass.HoverScale">1.08</sys:Double>
-    <!-- Tint alphas: lighter over real acrylic blur, stronger when there's no blur behind (Windows 10, snapshots) -->
-    <sys:Double x:Key="Glass.TintOverBlur">0.55</sys:Double>
-    <sys:Double x:Key="Glass.TintNoBlur">0.88</sys:Double>
-    <Color x:Key="Glass.Light">#FF6FAAFF</Color>
-    <Color x:Key="Glass.Mid">#FF2F72E6</Color>
-    <Color x:Key="Glass.Deep">#FF1648B8</Color>
-    <Color x:Key="Glass.Inner">#FF123C9C</Color>
-    <Color x:Key="Glass.Badge">#FF2B7BFF</Color>
-    <Color x:Key="Glass.HoverIcon">#FF1F5FE0</Color>
+    <!-- Backdrop blur strength (Gaussian sigma, device-independent pixels) -->
+    <sys:Double x:Key="Glass.BlurSigma">9</sys:Double>
+    <!-- White frost over the blur: alpha at the top-left highlight and at the edge -->
+    <sys:Double x:Key="Glass.FrostHighlight">0.16</sys:Double>
+    <sys:Double x:Key="Glass.FrostEdge">0.05</sys:Double>
+    <!-- Neutral darkening so white text stays readable: base alpha plus more over bright backgrounds -->
+    <sys:Double x:Key="Glass.ScrimBase">0.06</sys:Double>
+    <sys:Double x:Key="Glass.ScrimPerBrightness">0.45</sys:Double>
+    <!-- No backdrop (capture failed): solid enough to read on anything -->
+    <sys:Double x:Key="Glass.ScrimNoBackdrop">0.6</sys:Double>
+    <Color x:Key="Glass.HoverIcon">#FF1A1A1A</Color>
 
     <!-- Dark theme -->
     <Color x:Key="Dark.Plate">#D91C1C1C</Color>
