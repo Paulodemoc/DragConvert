@@ -8,6 +8,8 @@
 
 [![CI](https://github.com/Paulodemoc/DragConvert/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Paulodemoc/DragConvert/actions/workflows/ci.yml)
 [![Release](https://github.com/Paulodemoc/DragConvert/actions/workflows/release.yml/badge.svg)](https://github.com/Paulodemoc/DragConvert/releases)
+[![Latest release](https://img.shields.io/github/v/release/Paulodemoc/DragConvert?include_prereleases&label=version)](https://github.com/Paulodemoc/DragConvert/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/Paulodemoc/DragConvert/total)](https://github.com/Paulodemoc/DragConvert/releases)
 ![Platform](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?logo=windows&logoColor=white)
 ![.NET](https://img.shields.io/badge/.NET-10-512BD4?logo=dotnet&logoColor=white)
 ![Offline](https://img.shields.io/badge/runs-100%25%20offline-2EA44F)
@@ -88,8 +90,8 @@ Compress is offered for lossy formats (JPEG, PNG, TIFF, AVIF; MP3, M4A, OGG, Opu
 1. Start dragging one or more files.
 2. While dragging, hold <kbd>Ctrl</kbd>+<kbd>Shift</kbd> (configurable). The dial opens under the cursor.
 3. Optionally press <kbd>Alt</kbd> to switch between formats and tools.
-4. Drop on a tile. A notification tells you when it's done. To cancel, release the keys before you drop: the drag
-   carries on as a normal one.
+4. Drop on a tile. A notification tells you when it's done. To cancel, press <kbd>Esc</kbd> or release the keys
+   before you drop: the drag carries on as a normal one.
 
 Converted files go beside the originals (`holiday.heic` → `holiday.jpg`), or into one folder of your choice.
 
