@@ -223,7 +223,7 @@ internal sealed class SegmentsOverlayView : OverlayView
             };
             AutomationProperties.SetName(slice, _tiles[i].Detail is null ? $"Convert to {_tiles[i].Label}" : $"Convert {_tiles[i].Detail} files to {_tiles[i].Label}");
 
-            StackPanel labels = BuildLabels(_tiles[i], sweep);
+            StackPanel labels = BuildLabels(_tiles[i], sweep, mid);
             double labelRadius = (_inner + _outer) / 2;
             labels.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
             Canvas.SetLeft(labels, _radius + (labelRadius * Math.Cos(mid)) - (labels.DesiredSize.Width / 2));
@@ -403,21 +403,42 @@ internal sealed class SegmentsOverlayView : OverlayView
         return new PathGeometry([figure]);
     }
 
-    private StackPanel BuildLabels(OverlayTile tile, double sweep)
+    private StackPanel BuildLabels(OverlayTile tile, double sweep, double angle)
     {
-        // Room for the label: the chord across the slice at mid-radius, capped by the ring's thickness for wide slices.
-        double mid = (_inner + _outer) / 2;
-        double chord = 2 * mid * Math.Sin(Math.Min(sweep, Math.PI) / 2);
-        double maxWidth = Math.Min(chord - _gap - 10, (_outer - _inner) * 1.6);
+        // Room across the slice at mid-radius: the chord for slices at the top and bottom, but only about the ring's
+        // thickness for slices at the sides, whose long axis runs vertically. Blend by angle.
+        double midRadius = (_inner + _outer) / 2;
+        double chord = 2 * midRadius * Math.Sin(Math.Min(sweep, Math.PI) / 2);
+        double thickness = _outer - _inner;
+        double across = (chord * Math.Abs(Math.Sin(angle))) + (thickness * Math.Abs(Math.Cos(angle)));
+        double maxWidth = Math.Max(30, Math.Min(across, chord) - _gap - 14);
+
+        bool hasIcon = tile.Glyph is not null;
+        string text = tile.Label.ToUpperInvariant();
+        bool wraps = text.Contains(' ', StringComparison.Ordinal);
+        double fontSize = FitFontSize(text, hasIcon ? 10.5 : 13, maxWidth, wraps);
+
         var stack = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center, IsHitTestVisible = false };
+        if (hasIcon)
+        {
+            stack.Children.Add(new TextBlock
+            {
+                Text = tile.Icon,
+                FontFamily = OverlayTheme.IconFont,
+                FontSize = 16,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Margin = new Thickness(0, 0, 0, 3),
+            });
+        }
+
         stack.Children.Add(new TextBlock
         {
-            Text = tile.Label.ToUpperInvariant(),
+            Text = text,
             FontFamily = OverlayTheme.TextFont,
-            FontSize = tile.Label.Length > 9 ? 10.5 : 13,
+            FontSize = fontSize,
             FontWeight = FontWeights.Bold,
             TextAlignment = TextAlignment.Center,
-            TextWrapping = tile.Label.Contains(' ', StringComparison.Ordinal) ? TextWrapping.Wrap : TextWrapping.NoWrap,
+            TextWrapping = wraps ? TextWrapping.Wrap : TextWrapping.NoWrap,
             MaxWidth = maxWidth,
             HorizontalAlignment = HorizontalAlignment.Center,
         });
@@ -434,6 +455,27 @@ internal sealed class SegmentsOverlayView : OverlayView
         }
 
         return stack;
+    }
+
+    /// <summary>
+    /// The largest size (down to 8 px) at which the label fits: every word within the width when it can wrap, the whole
+    /// label otherwise.
+    /// </summary>
+    private double FitFontSize(string text, double preferred, double maxWidth, bool wraps)
+    {
+        string[] parts = wraps ? text.Split(' ', StringSplitOptions.RemoveEmptyEntries) : [text];
+        double dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        var typeface = new Typeface(OverlayTheme.TextFont, FontStyles.Normal, FontWeights.Bold, FontStretches.Normal);
+        for (double size = preferred; size > 8; size -= 0.5)
+        {
+            double widest = parts.Max(part => new FormattedText(part, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, typeface, size, Brushes.Black, dpi).WidthIncludingTrailingWhitespace);
+            if (widest <= maxWidth)
+            {
+                return size;
+            }
+        }
+
+        return 8;
     }
 
     private void StyleSlice(int index, bool hovered, bool animate = true)

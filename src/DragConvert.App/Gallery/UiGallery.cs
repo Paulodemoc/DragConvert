@@ -72,6 +72,20 @@ internal static class UiGallery
             animate: false);
             v.SetHovered(3);
         }),
+        ("06c-pdf-tools", v =>
+        {
+            v.SetBadge(Doc, 1);
+            v.SetTiles(
+            [
+                new OverlayTile("Split pages", null, Doc, "\uE8C6"),
+                new OverlayTile("Pages to images", null, Doc, "\uE91B"),
+                new OverlayTile("Compress", null, Doc, "\uE73F"),
+                new OverlayTile("Remove metadata", null, Doc, "\uE75C"),
+            ],
+            "Tools · Relatorio_Anual.pdf",
+            animate: false);
+            v.SetHovered(2);
+        }),
         ("07-nothing-to-convert", v =>
         {
             v.SetBadge(null, 1);
