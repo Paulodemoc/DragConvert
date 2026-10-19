@@ -36,4 +36,4 @@ Providers.Windows holds providers/tools built on WinRT APIs (e.g. Windows.Data.P
 
 ## Current milestone
 See docs/design.md, Implementation plan. Work on one milestone at a time.
-Status: M5 done in code; Segments overlay style added; M4b format breadth done in code (ADR 0009, roadmap tiers A+B). Distribution is GitHub Releases only, no Store (ADR 0008). Next: M6 packaging (self-contained build, GitHub release, SignPath, winget).
+Status: M5 done in code; Segments overlay style added; M4b format breadth done in code (ADR 0009, roadmap tiers A+B). Distribution is GitHub Releases only, no Store (ADR 0008). v0.1.1 released (GitHub Releases, unsigned; tag v* runs .github/workflows/release.yml). winget PR microsoft/winget-pkgs#456240 open. Next: SignPath signing (owner applies), then winget updates per release.
