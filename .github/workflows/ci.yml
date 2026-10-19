@@ -1,11 +1,19 @@
 name: CI
 
-# Manual only for now; enable push/pull_request triggers once there is more to test.
 on:
+  push:
+    branches: [main, dev]
+    paths-ignore: ['**.md', 'docs/**', 'assets/**']
+  pull_request:
+    branches: [main, dev]
   workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -33,12 +41,9 @@ jobs:
       - name: Test
         run: dotnet test DragConvert.slnx --configuration Release --no-build --logger trx --results-directory TestResults
 
-      - name: Smoke-run the app
+      - name: Smoke-run the app (starts, converts a tiny image, exits)
         shell: pwsh
-        run: |
-          $p = Start-Process -FilePath "src/DragConvert.App/bin/Release/net10.0-windows10.0.19041.0/DragConvert.exe" -ArgumentList "--smoke" -PassThru
-          if (-not $p.WaitForExit(30000)) { $p.Kill(); throw "App did not exit within 30 s" }
-          if ($p.ExitCode -ne 0) { throw "App exited with code $($p.ExitCode)" }
+        run: ./tools/smoke.ps1 -Exe "src/DragConvert.App/bin/Release/net10.0-windows10.0.19041.0/DragConvert.exe"
 
       - name: Upload test results
         if: always()

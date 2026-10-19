@@ -41,3 +41,11 @@ AppPackages/
 Thumbs.db
 desktop.ini
 .DS_Store
+
+# Logs and scratch files
+*.log
+*.tmp
+
+# Local AI-assistant state (CLAUDE.md is committed on purpose)
+.claude/settings.local.json
+.remember/

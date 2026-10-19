@@ -80,6 +80,13 @@ public partial class App : Application
         _instance = SingleInstance.TryAcquire();
         if (_instance is null)
         {
+            if (options.Smoke)
+            {
+                // Handing off would "pass" without testing anything: fail instead.
+                Shutdown(2);
+                return;
+            }
+
             SingleInstance.Send(options.Paths.Count > 0 ? InstanceMessage.Open(options.Paths) : InstanceMessage.Show());
             Shutdown(0);
             return;
@@ -190,10 +197,55 @@ public partial class App : Application
 
         Log.Information("Startup finished in {Ms:F0} ms", Stopwatch.GetElapsedTime(startTimestamp).TotalMilliseconds);
 
-        // --smoke: start fully, then exit once the dispatcher is idle. Used by CI to prove the app starts and exits cleanly.
+        // --smoke: start fully, convert a tiny image, then exit once the dispatcher is idle. Used by CI to prove the app
+        // (including a single-file release build, whose native libraries are extracted at run time) starts and works.
         if (options.Smoke)
         {
-            Dispatcher.BeginInvoke(() => Shutdown(0), DispatcherPriority.ApplicationIdle);
+            _ = Dispatcher.InvokeAsync(async () => Shutdown(await SmokeConvertAsync(catalog) ? 0 : 1), DispatcherPriority.ApplicationIdle);
+        }
+    }
+
+    private static async Task<bool> SmokeConvertAsync(FormatCatalog catalog)
+    {
+        string folder = Path.Combine(Path.GetTempPath(), "DragConvert-smoke-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        try
+        {
+            // A 2×2, 24-bit BMP: 54-byte header, then two rows of 6 pixel bytes padded to 8.
+            byte[] bmp = new byte[70];
+            "BM"u8.CopyTo(bmp);
+            BitConverter.TryWriteBytes(bmp.AsSpan(2), bmp.Length);
+            BitConverter.TryWriteBytes(bmp.AsSpan(10), 54);
+            BitConverter.TryWriteBytes(bmp.AsSpan(14), 40);
+            BitConverter.TryWriteBytes(bmp.AsSpan(18), 2);
+            BitConverter.TryWriteBytes(bmp.AsSpan(22), 2);
+            BitConverter.TryWriteBytes(bmp.AsSpan(26), (short)1);
+            BitConverter.TryWriteBytes(bmp.AsSpan(28), (short)24);
+            bmp.AsSpan(54).Fill(0x80);
+            string input = Path.Combine(folder, "smoke.bmp");
+            string output = Path.Combine(folder, "smoke.png");
+            await File.WriteAllBytesAsync(input, bmp);
+
+            IConversionProvider provider = catalog.FindProvider(input, MediaFormats.Png) ?? throw new InvalidOperationException("No BMP → PNG provider");
+            await provider.ConvertAsync(new ConversionJob(input, output, MediaFormats.Png, new Dictionary<string, string>()), null, CancellationToken.None);
+            bool ok = new FileInfo(output).Length > 0;
+            Log.Information("Smoke conversion BMP → PNG: {Result}", ok ? "ok" : "empty output");
+            return ok;
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Smoke conversion failed");
+            return false;
+        }
+        finally
+        {
+            try
+            {
+                Directory.Delete(folder, recursive: true);
+            }
+            catch (IOException)
+            {
+            }
         }
     }
 
