@@ -24,4 +24,4 @@ C# 14, .NET 10, WPF (Fluent theme), CsWin32. Solution in src/, tests in tests/.
 
 ## Current milestone
 See docs/design.md, Implementation plan. Work on one milestone at a time.
-Status: M1 spike code done (hook thread, key polling, overlay with layered/dwm renderers, logging). Waiting on the user to run docs/test-matrix.md; then write docs/decisions/0001-drag-detection.md.
+Status: M1 done (ADR 0001); Explorer verified, other test-matrix sources and dwm renderer still open; UI polish deferred to M3. Next: M2 core engine and first providers.

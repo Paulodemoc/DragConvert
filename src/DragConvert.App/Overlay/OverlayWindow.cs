@@ -57,6 +57,7 @@ internal sealed class OverlayWindow : Window
     private int _hovered = -1;
     private string _dragSummary = string.Empty;
     private (int X, int Y) _anchor;
+    private bool _dragEntered;
 
     public OverlayWindow(OverlayRenderer renderer)
     {
@@ -158,6 +159,7 @@ internal sealed class OverlayWindow : Window
         SetToolsMode(toolsMode);
         SetHovered(-1);
         _dragSummary = string.Empty;
+        _dragEntered = false;
         _caption.Text = toolsMode ? "Drop on a tool" : "Drop on a format";
         _anchor = (x, y);
 
@@ -199,6 +201,16 @@ internal sealed class OverlayWindow : Window
     protected override void OnDragEnter(DragEventArgs e)
     {
         base.OnDragEnter(e);
+
+        // DragEnter bubbles up from every tile the cursor crosses; read the data once per show.
+        if (_dragEntered)
+        {
+            UpdateHover(e);
+            e.Handled = true;
+            return;
+        }
+
+        _dragEntered = true;
         IReadOnlyList<string> formats = SafeFormats(e.Data);
         IReadOnlyList<string> paths = SafePaths(e.Data);
         IReadOnlyList<string> virtualNames = SafeVirtualNames(e.Data);
