@@ -28,6 +28,8 @@ public sealed class ToolTests(MediaFixtures fixtures) : IClassFixture<MediaFixtu
         for (int i = 0; i < pages; i++)
         {
             PdfPage page = document.AddPage();
+            // Explicit: PDFsharp's default follows the machine's region (Letter on US-English CI runners).
+            page.Size = PdfSharp.PageSize.A4;
             using XGraphics gfx = XGraphics.FromPdfPage(page);
             gfx.DrawRectangle(new XSolidBrush(XColor.FromArgb(255, 40 * i, 120, 200)), 50, 50, 300, 200);
         }
@@ -144,7 +146,7 @@ public sealed class ToolTests(MediaFixtures fixtures) : IClassFixture<MediaFixtu
         string[] pngs = Directory.GetFiles(folder, "*.png");
         Assert.Equal(2, pngs.Length);
         var info = new MagickImageInfo(pngs[0]);
-        // PDFsharp's default page is A4 (8.27 x 11.69 in).
+        // A4 (8.27 x 11.69 in).
         Assert.InRange(info.Width, 1235u, 1245u);
         Assert.InRange(info.Height, 1749u, 1759u);
     }
