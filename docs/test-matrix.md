@@ -90,3 +90,18 @@ Start with `tools\run-spike.cmd` (non-elevated). Notifications appear bottom-rig
 | T15 | Drag a .docx with the trigger held | Caption "Nothing here can be converted", no tiles | |
 | T16 | Drag an Outlook attachment with the trigger held | Caption "Attachments can't be converted yet" | |
 | T17 | Start a second copy of DragConvert.exe | No second tray icon; the existing tray window opens | |
+
+## M4: PDF and tools
+
+| # | Check | Expected | Result |
+|---|---|---|---|
+| P1 | Drag a PDF, hold Ctrl+Shift, then add Alt | Ring switches to tools (Split pages, Pages to images, Compress, Remove metadata); releasing Alt switches back | |
+| P2 | Drag two PDFs, Alt, drop on Merge PDFs | "<first> (merged).pdf" with all pages in drag order | |
+| P3 | Split pages on a 3-page PDF | Folder "<name> pages" with 3 PDFs | |
+| P4 | Pages to images | Folder "<name> images" with one PNG per page, sharp at 100% zoom | |
+| P5 | Compress a scanned or photo-heavy PDF | Smaller "(compressed)" copy that looks the same; a text-only PDF reports "already as small as…" | |
+| P6 | Drag 3 photos, Alt, Combine to PDF | One PDF, a page per photo, upright | |
+| P7 | Remove metadata on a phone photo | "(clean).jpg" with no camera/GPS info (file Properties → Details), still upright | |
+| P8 | Remove metadata on an MP3 with tags | "(clean).mp3" plays; title/artist gone | |
+| P9 | Password-protected PDF → Split pages | Notification says the PDF is password-protected | |
+| P10 | Tray window with a PDF | Tools section below formats; buttons work with Tab/Enter | |

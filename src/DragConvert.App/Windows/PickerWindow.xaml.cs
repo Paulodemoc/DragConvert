@@ -6,9 +6,19 @@ using System.Windows.Input;
 using DragConvert.App.Conversion;
 using DragConvert.App.Theme;
 using DragConvert.Core.Conversion;
+using DragConvert.Core.Tools;
 using Serilog;
 
 namespace DragConvert.App.Windows;
+
+internal sealed record ToolChoice(IFileTool Tool, string? Detail)
+{
+    public string Label => Tool.DisplayName;
+
+    public string Glyph => Tool.Glyph;
+
+    public string AccessibleName => Detail is null ? Tool.DisplayName : $"{Tool.DisplayName}, {Detail} files";
+}
 
 internal sealed record TargetChoice(MediaFormat Target, string Label, string? Detail)
 {
@@ -69,10 +79,11 @@ internal sealed partial class PickerWindow : Window
 
             _set = set;
             IReadOnlyList<TargetOption> options = _coordinator.Catalog.TargetOptionsFor(set.Files);
+            IReadOnlyList<ToolOption> tools = _coordinator.Tools.ToolOptionsFor(set.Files);
             DropTitle.Text = set.Files.Count == 1 ? Path.GetFileName(set.Files[0]) : $"{set.Files.Count:N0} files";
             DropDetail.Text = set.FolderCount > 0 ? $"From {set.FolderCount} folder{(set.FolderCount == 1 ? string.Empty : "s")}" : string.Empty;
 
-            if (options.Count == 0)
+            if (options.Count == 0 && tools.Count == 0)
             {
                 DropDetail.Text = set.Files.Count == 0 ? "There are no files here." : "None of these can be converted.";
                 return;
@@ -81,6 +92,11 @@ internal sealed partial class PickerWindow : Window
             Targets.ItemsSource = options
                 .Select(o => new TargetChoice(o.Target, o.Target.DisplayName, o.AppliesToAll ? null : $"{o.FileCount} of {o.TotalFiles}"))
                 .ToList();
+            ToolsList.ItemsSource = tools
+                .Select(o => new ToolChoice(o.Tool, o.AppliesToAll ? null : $"{o.FileCount} of {o.TotalFiles}"))
+                .ToList();
+            FormatsHeader.Visibility = Targets.Visibility = options.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+            ToolsHeader.Visibility = ToolsList.Visibility = tools.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
             TargetsPanel.Visibility = Visibility.Visible;
 
             // Keyboard: focus the first format so Enter converts and Tab/arrows move between them.
@@ -160,6 +176,7 @@ internal sealed partial class PickerWindow : Window
         _paths = [];
         _set = null;
         Targets.ItemsSource = null;
+        ToolsList.ItemsSource = null;
         TargetsPanel.Visibility = Visibility.Collapsed;
         DropTitle.Text = "Drop files or folders here";
         DropDetail.Text = "Or drag with Ctrl+Shift held anywhere to convert in place.";
@@ -177,11 +194,20 @@ internal sealed partial class PickerWindow : Window
         }
     }
 
+    private void OnToolClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: ToolChoice choice })
+        {
+            _ = _coordinator.RunToolAsync(_paths, choice.Tool, _set);
+            Clear();
+        }
+    }
+
     private void OnClearClick(object sender, RoutedEventArgs e) => Clear();
 
     private void OnOpenRecentClick(object sender, RoutedEventArgs e)
     {
-        if (sender is Button { Tag: RecentConversion recent } && File.Exists(recent.OutputPath))
+        if (sender is Button { Tag: RecentConversion recent } && (File.Exists(recent.OutputPath) || Directory.Exists(recent.OutputPath)))
         {
             Shell.Open(recent.OutputPath);
         }
@@ -189,7 +215,7 @@ internal sealed partial class PickerWindow : Window
 
     private void OnRevealRecentClick(object sender, RoutedEventArgs e)
     {
-        if (sender is Button { Tag: RecentConversion recent } && File.Exists(recent.OutputPath))
+        if (sender is Button { Tag: RecentConversion recent } && (File.Exists(recent.OutputPath) || Directory.Exists(recent.OutputPath)))
         {
             Shell.Reveal(recent.OutputPath);
         }

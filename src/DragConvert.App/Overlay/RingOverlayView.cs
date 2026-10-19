@@ -223,7 +223,7 @@ internal sealed class RingOverlayView : OverlayView
         {
             StyleTile(_tileViews[tile], hovered: true);
             OverlayTile t = _tiles[tile];
-            ShowCaption(t.Detail is null ? $"{t.Label}, beside the original" : $"{t.Label} for {t.Detail} files");
+            ShowCaption(t.Detail is null ? (t.Glyph is null ? $"{t.Label}, beside the original" : t.Label) : $"{t.Label} for {t.Detail} files");
         }
         else
         {
@@ -353,7 +353,7 @@ internal sealed class RingOverlayView : OverlayView
         var stack = new StackPanel { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
         stack.Children.Add(new TextBlock
         {
-            Text = OverlayTheme.Glyph(tile.Category),
+            Text = tile.Icon,
             FontFamily = OverlayTheme.IconFont,
             FontSize = OverlayTheme.Number("Overlay.GlyphSize"),
             HorizontalAlignment = HorizontalAlignment.Center,
@@ -363,8 +363,12 @@ internal sealed class RingOverlayView : OverlayView
         {
             Text = tile.Label,
             FontFamily = OverlayTheme.TextFont,
-            FontSize = OverlayTheme.Number("Overlay.LabelSize"),
+            // Long names shrink to fit the square tile; multi-word ones ("Remove metadata") wrap onto two lines.
+            FontSize = tile.Label.Length > 6 ? OverlayTheme.Number("Overlay.DetailSize") : OverlayTheme.Number("Overlay.LabelSize"),
             FontWeight = FontWeights.SemiBold,
+            TextWrapping = tile.Label.Contains(' ', StringComparison.Ordinal) ? TextWrapping.Wrap : TextWrapping.NoWrap,
+            TextAlignment = TextAlignment.Center,
+            MaxWidth = OverlayTheme.Number("Overlay.TileSize") - 8,
             HorizontalAlignment = HorizontalAlignment.Center,
         });
         if (tile.Detail is { } detail)

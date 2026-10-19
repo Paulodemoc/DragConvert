@@ -57,6 +57,21 @@ internal static class UiGallery
             v.SetBadge(Video, 1);
             v.SetTiles([T("WebM", Video), T("GIF", Image), T("MP3", Audio), T("M4A", Audio)], "clip.mov", animate: false);
         }),
+        ("06b-tools", v =>
+        {
+            v.SetBadge(Doc, 2);
+            v.SetTiles(
+            [
+                new OverlayTile("Merge PDFs", null, Doc, ""),
+                new OverlayTile("Split pages", null, Doc, ""),
+                new OverlayTile("Pages to images", null, Doc, ""),
+                new OverlayTile("Compress", null, Doc, ""),
+                new OverlayTile("Remove metadata", null, Doc, ""),
+            ],
+            "Tools · 2 files",
+            animate: false);
+            v.SetHovered(3);
+        }),
         ("07-nothing-to-convert", v =>
         {
             v.SetBadge(null, 1);

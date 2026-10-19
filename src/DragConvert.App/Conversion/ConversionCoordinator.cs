@@ -5,6 +5,7 @@ using System.Windows.Threading;
 using DragConvert.App.Notifications;
 using DragConvert.Core.Conversion;
 using DragConvert.Core.Settings;
+using DragConvert.Core.Tools;
 using Serilog;
 
 namespace DragConvert.App.Conversion;
@@ -19,9 +20,10 @@ internal sealed record BatchOutcome(int Succeeded, int Failed, int Cancelled, bo
     public bool AllSucceeded => Succeeded > 0 && Failed == 0 && Cancelled == 0;
 }
 
-internal sealed record RecentConversion(string InputPath, string OutputPath, MediaFormat Target, DateTime Finished)
+/// <summary>A finished conversion or tool run; <see cref="Action"/> is the target format or the tool's name.</summary>
+internal sealed record RecentConversion(string InputPath, string OutputPath, string Action, DateTime Finished)
 {
-    public string Description => $"{Path.GetFileName(InputPath)} → {Target.DisplayName}";
+    public string Description => $"{Path.GetFileName(InputPath)} → {Action}";
 }
 
 /// <summary>
@@ -38,14 +40,16 @@ internal sealed class ConversionCoordinator : IDisposable
     private static readonly TimeSpan ProgressInterval = TimeSpan.FromMilliseconds(500);
 
     private readonly JobQueue _queue;
+    private readonly ToolRunner _tools = new();
     private readonly NotificationService _notifications;
     private readonly Func<AppSettings> _settings;
     private readonly Dispatcher _dispatcher;
     private readonly Dictionary<string, CancellationTokenSource> _running = [];
 
-    public ConversionCoordinator(FormatCatalog catalog, NotificationService notifications, Func<AppSettings> settings, Dispatcher dispatcher)
+    public ConversionCoordinator(FormatCatalog catalog, ToolCatalog tools, NotificationService notifications, Func<AppSettings> settings, Dispatcher dispatcher)
     {
         Catalog = catalog;
+        Tools = tools;
         _queue = new JobQueue(catalog);
         _notifications = notifications;
         _settings = settings;
@@ -54,6 +58,8 @@ internal sealed class ConversionCoordinator : IDisposable
     }
 
     public FormatCatalog Catalog { get; }
+
+    public ToolCatalog Tools { get; }
 
     /// <summary>Most recent successful conversions first (UI thread only).</summary>
     public ObservableCollection<RecentConversion> Recent { get; } = [];
@@ -111,7 +117,131 @@ internal sealed class ConversionCoordinator : IDisposable
         }
     }
 
-    public void Dispose() => _queue.Dispose();
+    /// <summary>Runs a tool on a drop, with the same confirmation, progress and summary behaviour as conversions.</summary>
+    public async Task<BatchOutcome> RunToolAsync(IReadOnlyList<string> droppedPaths, IFileTool tool, DropSet? expanded = null, bool quietIfFast = false)
+    {
+        try
+        {
+            DropSet set = expanded ?? await ExpandAsync(droppedPaths);
+            var (accepted, skipped) = ToolCatalog.Plan(tool, set.Files);
+            Logger.Information("Tool {Tool}: {Files} file(s); using {Accepted}, skipping {Skipped}", tool.Id, set.Files.Count, accepted.Count, skipped.Count);
+
+            if (accepted.Count < (tool.CombinesInputs ? 2 : 1))
+            {
+                _notifications.Show(new NotificationText(
+                    $"{tool.DisplayName}: nothing to do",
+                    tool.CombinesInputs ? $"{tool.DisplayName} needs at least two matching files." : $"{tool.DisplayName} doesn't apply to these files."));
+                return BatchOutcome.Nothing;
+            }
+
+            if (!tool.CombinesInputs && accepted.Count > ConfirmThreshold
+                && !await _notifications.ConfirmAsync(new NotificationText($"{tool.DisplayName}: {accepted.Count} files?", "Results are saved beside each original."), "Go ahead"))
+            {
+                return BatchOutcome.Declined;
+            }
+
+            return await RunToolBatchAsync(tool, accepted, skipped, quietIfFast);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Logger.Error(ex, "Tool run failed");
+            _notifications.Show(new NotificationText("Couldn't read the dropped files", ex.Message));
+            return BatchOutcome.Nothing;
+        }
+    }
+
+    public void Dispose()
+    {
+        _queue.Dispose();
+        _tools.Dispose();
+    }
+
+    private async Task<BatchOutcome> RunToolBatchAsync(IFileTool tool, IReadOnlyList<string> accepted, IReadOnlyList<string> skipped, bool quietIfFast)
+    {
+        string tag = Guid.NewGuid().ToString("N")[..12];
+        using var cts = new CancellationTokenSource();
+        lock (_running)
+        {
+            _running[tag] = cts;
+        }
+
+        var stopwatch = Stopwatch.StartNew();
+        double fraction = 0;
+        Task<IReadOnlyList<ToolResult>> run = _tools.RunAsync(tool, accepted, new InlineProgress(p => Volatile.Write(ref fraction, p)), _settings().OutputDirectory, cts.Token);
+
+        bool progressShown = false;
+        uint sequence = 1;
+        if (await Task.WhenAny(run, Task.Delay(ProgressDelay)) != run)
+        {
+            progressShown = true;
+            string what = accepted.Count == 1 || tool.CombinesInputs ? Path.GetFileName(accepted[0]) + (accepted.Count > 1 ? $" and {accepted.Count - 1} more" : string.Empty) : $"{accepted.Count} files";
+            _notifications.ShowProgress(tag, tool.DisplayName, what, [new NotificationAction("Cancel", "cancel", tag)]);
+            while (await Task.WhenAny(run, Task.Delay(ProgressInterval)) != run)
+            {
+                _notifications.UpdateProgress(tag, Volatile.Read(ref fraction), "Working…", ++sequence);
+            }
+        }
+
+        IReadOnlyList<ToolResult> results = await run;
+        lock (_running)
+        {
+            _running.Remove(tag);
+        }
+
+        Logger.Information(
+            "Tool {Tool} finished in {Seconds:F1} s: {Ok} succeeded, {Failed} failed",
+            tool.Id,
+            stopwatch.Elapsed.TotalSeconds,
+            results.Count(r => r.Status == ConversionStatus.Succeeded),
+            results.Count(r => r.Status == ConversionStatus.Failed));
+        foreach (ToolResult failure in results.Where(r => r.Status == ConversionStatus.Failed))
+        {
+            Logger.Warning("Tool {Tool} failed on {Inputs}: {Error}", tool.Id, failure.Inputs, failure.Error);
+        }
+
+        var outputs = results.Where(r => r.Status == ConversionStatus.Succeeded).ToList();
+        await _dispatcher.InvokeAsync(() =>
+        {
+            foreach (ToolResult ok in outputs)
+            {
+                Recent.Insert(0, new RecentConversion(ok.Inputs[0], ok.OutputPath!, tool.DisplayName, DateTime.Now));
+            }
+
+            while (Recent.Count > 10)
+            {
+                Recent.RemoveAt(Recent.Count - 1);
+            }
+        });
+
+        var outcome = new BatchOutcome(
+            outputs.Count,
+            results.Count(r => r.Status == ConversionStatus.Failed),
+            results.Count(r => r.Status == ConversionStatus.Cancelled),
+            Notified: true);
+        if (quietIfFast && !progressShown && outcome.AllSucceeded && skipped.Count == 0)
+        {
+            return outcome with { Notified = false };
+        }
+
+        var actions = new List<NotificationAction>();
+        if (outputs.Count == 1)
+        {
+            actions.Add(new NotificationAction(tool.OutputKind == ToolOutputKind.Folder ? "Open folder" : "Open", "open", outputs[0].OutputPath!));
+        }
+
+        if (outputs.Count > 0)
+        {
+            actions.Add(new NotificationAction("Show in folder", "reveal", outputs[0].OutputPath!));
+        }
+
+        if (outcome.Failed > 0)
+        {
+            actions.Add(new NotificationAction("Open log", "log"));
+        }
+
+        _notifications.Show(ResultSummary.DescribeTool(tool.DisplayName, results, skipped), actions, progressShown ? tag : null);
+        return outcome;
+    }
 
     private async Task<BatchOutcome> RunAsync(DropPlan plan, bool truncated, bool quietIfFast)
     {
@@ -183,7 +313,7 @@ internal sealed class ConversionCoordinator : IDisposable
         {
             foreach (ConversionResult ok in results.Where(r => r.Status == ConversionStatus.Succeeded))
             {
-                Recent.Insert(0, new RecentConversion(ok.InputPath, ok.OutputPath!, ok.Target, DateTime.Now));
+                Recent.Insert(0, new RecentConversion(ok.InputPath, ok.OutputPath!, ok.Target.DisplayName, DateTime.Now));
             }
 
             while (Recent.Count > 10)
@@ -245,10 +375,10 @@ internal sealed class ConversionCoordinator : IDisposable
                 }
 
                 break;
-            case "open" when File.Exists(argument):
+            case "open" when File.Exists(argument) || Directory.Exists(argument):
                 Shell.Open(argument);
                 break;
-            case "reveal" when File.Exists(argument):
+            case "reveal" when File.Exists(argument) || Directory.Exists(argument):
                 Shell.Reveal(argument);
                 break;
             case "log":

@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Providers built on Windows' own APIs (WinRT): no extra engines to bundle. No UI, no Win32 interop. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DragConvert.Core\DragConvert.Core.csproj" />
+    <ProjectReference Include="..\DragConvert.Providers\DragConvert.Providers.csproj" />
+  </ItemGroup>
+
+</Project>

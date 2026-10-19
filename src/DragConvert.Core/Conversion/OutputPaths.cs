@@ -7,14 +7,21 @@ public static class OutputPaths
     public const string TempMarker = ".dragconvert-tmp";
 
     /// <summary><c>&lt;name&gt;.&lt;ext&gt;</c> in the input's folder (or <paramref name="outputDirectory"/>); on collision <c>&lt;name&gt; (1).&lt;ext&gt;</c>, and so on.</summary>
-    public static string PlanFinal(string inputPath, MediaFormat target, string? outputDirectory = null)
+    public static string PlanFinal(string inputPath, MediaFormat target, string? outputDirectory = null) =>
+        PlanFinal(inputPath, string.Empty, target.Extension, outputDirectory);
+
+    /// <summary>
+    /// <c>&lt;name&gt;&lt;suffix&gt;&lt;extension&gt;</c> in the input's folder (or <paramref name="outputDirectory"/>), e.g.
+    /// "report (compressed).pdf" or the folder "report pages"; on collision a counter is added before the extension.
+    /// </summary>
+    public static string PlanFinal(string inputPath, string suffix, string extension, string? outputDirectory = null)
     {
         string directory = outputDirectory ?? Path.GetDirectoryName(Path.GetFullPath(inputPath)) ?? ".";
-        string name = Path.GetFileNameWithoutExtension(inputPath);
-        string candidate = Path.Combine(directory, name + target.Extension);
+        string name = Path.GetFileNameWithoutExtension(inputPath) + suffix;
+        string candidate = Path.Combine(directory, name + extension);
         for (int n = 1; File.Exists(candidate) || Directory.Exists(candidate); n++)
         {
-            candidate = Path.Combine(directory, $"{name} ({n}){target.Extension}");
+            candidate = Path.Combine(directory, $"{name} ({n}){extension}");
         }
 
         return candidate;

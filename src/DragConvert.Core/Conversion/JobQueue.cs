@@ -80,6 +80,11 @@ public sealed class JobQueue : IDisposable
         {
             return ConversionResult.Failure(inputPath, target, ex.Message);
         }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // A bug or an unexpected file: report it like any failure instead of losing the result.
+            return ConversionResult.Failure(inputPath, target, $"Unexpected error: {ex.Message}");
+        }
         finally
         {
             if (tempPath is not null)

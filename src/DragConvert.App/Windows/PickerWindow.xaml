@@ -26,7 +26,7 @@
 
             <!-- Target formats for the current files. -->
             <StackPanel x:Name="TargetsPanel" Visibility="Collapsed" Margin="0,0,0,12">
-                <TextBlock Text="Convert to" FontWeight="SemiBold" Margin="0,0,0,6" />
+                <TextBlock x:Name="FormatsHeader" Text="Convert to" FontWeight="SemiBold" Margin="0,0,0,6" />
                 <ItemsControl x:Name="Targets">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
@@ -36,6 +36,27 @@
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
                             <Button Margin="0,0,6,6" MinWidth="80" Padding="10,6" Click="OnTargetClick" Tag="{Binding}"
+                                    AutomationProperties.Name="{Binding AccessibleName}">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Glyph}" FontFamily="{StaticResource Font.Icons}" FontSize="16"
+                                               HorizontalAlignment="Center" Margin="0,0,0,2" />
+                                    <TextBlock Text="{Binding Label}" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                                    <TextBlock Text="{Binding Detail}" FontSize="11" Opacity="0.75" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock x:Name="ToolsHeader" Text="Tools" FontWeight="SemiBold" Margin="0,6,0,6" />
+                <ItemsControl x:Name="ToolsList">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Button Margin="0,0,6,6" MinWidth="80" Padding="10,6" Click="OnToolClick" Tag="{Binding}"
                                     AutomationProperties.Name="{Binding AccessibleName}">
                                 <StackPanel>
                                     <TextBlock Text="{Binding Glyph}" FontFamily="{StaticResource Font.Icons}" FontSize="16"

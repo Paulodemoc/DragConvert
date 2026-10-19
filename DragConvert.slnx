@@ -4,6 +4,7 @@
     <Project Path="src/DragConvert.Cli/DragConvert.Cli.csproj" />
     <Project Path="src/DragConvert.Core/DragConvert.Core.csproj" />
     <Project Path="src/DragConvert.Native/DragConvert.Native.csproj" />
+    <Project Path="src/DragConvert.Providers.Windows/DragConvert.Providers.Windows.csproj" />
     <Project Path="src/DragConvert.Providers/DragConvert.Providers.csproj" />
   </Folder>
   <Folder Name="/tests/">

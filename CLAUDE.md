@@ -4,6 +4,7 @@ Windows tray app that converts files from a drag gesture. Offline only. See docs
 
 ## Stack
 C# 14, .NET 10, WPF (Fluent theme), CsWin32. Solution in src/, tests in tests/.
+Providers.Windows holds providers/tools built on WinRT APIs (e.g. Windows.Data.Pdf); Core and Providers stay OS-neutral.
 
 ## Rules
 - All Win32/COM code lives in DragConvert.Native. Core and Providers must not reference UI or Win32.
@@ -28,10 +29,10 @@ C# 14, .NET 10, WPF (Fluent theme), CsWin32. Solution in src/, tests in tests/.
 - UI gallery (every overlay state, live): DragConvert.exe --gallery
 - UI snapshots to PNG (review visuals; also regenerates Assets/DragConvert.ico source): DragConvert.exe --snapshot[=dir] (default artifacts/ui)
 - Real overlay window for screenshots (DWM effects, glass backdrop): DragConvert.exe --preview-overlay[=glass|layered|dwm]
-- CLI harness: dotnet run --project src/DragConvert.Cli -- formats <file> | convert <file>... <format> [--out <dir>]
+- CLI harness: dotnet run --project src/DragConvert.Cli -- formats <file> | convert <file>... <format> | tool <tool-id> <file>... [--out <dir>]
 - Run app: dotnet run --project src/DragConvert.App -- --console [--renderer=layered|dwm]
 - Logs: %LOCALAPPDATA%\DragConvert\logs
 
 ## Current milestone
 See docs/design.md, Implementation plan. Work on one milestone at a time.
-Status: M3 done pending the owner's review of the UI pass (ADR 0005). Next: M4 PDF and tools (Alt tiles).
+Status: M4 done (tools: merge/split/pages-to-images/compress/combine-to-PDF/remove-metadata, Alt tiles; ADR 0006). Next: M5 hardening.

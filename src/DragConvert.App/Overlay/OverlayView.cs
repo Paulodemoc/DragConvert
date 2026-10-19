@@ -4,8 +4,13 @@ using DragConvert.Core.Conversion;
 
 namespace DragConvert.App.Overlay;
 
-/// <summary>One tile: its label, an optional second line such as "3 of 5", and the category that picks its icon.</summary>
-internal sealed record OverlayTile(string Label, string? Detail, MediaCategory Category);
+/// <summary>
+/// One tile: its label, an optional second line such as "3 of 5", and its icon: the category's, or a tool's own glyph.
+/// </summary>
+internal sealed record OverlayTile(string Label, string? Detail, MediaCategory Category, string? Glyph = null)
+{
+    public string Icon => Glyph ?? Theme.OverlayTheme.Glyph(Category);
+}
 
 /// <summary>
 /// What every overlay style draws: tiles around a centre, a badge for what's being dragged, a caption, and the

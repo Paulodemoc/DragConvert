@@ -52,6 +52,47 @@ public static class ResultSummary
         return new NotificationText(title, string.Join(Environment.NewLine, lines));
     }
 
+    /// <summary>Wording for a tool run: "Compressed 3 files", "Couldn't merge: reason".</summary>
+    public static NotificationText DescribeTool(string toolName, IReadOnlyList<DragConvert.Core.Tools.ToolResult> results, IReadOnlyList<string> skipped)
+    {
+        var succeeded = results.Where(r => r.Status == ConversionStatus.Succeeded).ToList();
+        var failed = results.Where(r => r.Status == ConversionStatus.Failed).ToList();
+        int cancelled = results.Count(r => r.Status == ConversionStatus.Cancelled);
+        var lines = new List<string>();
+
+        string title;
+        if (cancelled > 0)
+        {
+            title = $"{toolName} cancelled";
+            lines.Add($"{succeeded.Count} of {results.Count} done before cancelling.");
+        }
+        else if (failed.Count == 0)
+        {
+            title = succeeded.Count == 1 ? $"{toolName}: done" : $"{toolName}: {succeeded.Count} done";
+            if (succeeded.Count == 1)
+            {
+                lines.Add(Path.GetFileName(succeeded[0].OutputPath!));
+            }
+        }
+        else if (succeeded.Count == 0 && failed.Count == 1)
+        {
+            title = $"{toolName} failed";
+            lines.Add(failed[0].Error ?? "Unknown error.");
+        }
+        else
+        {
+            title = $"{toolName}: {succeeded.Count} done, {failed.Count} failed";
+            lines.Add(string.Join("; ", failed.Take(NamesShown).Select(f => $"{Path.GetFileName(f.Inputs[0])}: {f.Error}")) + More(failed.Count));
+        }
+
+        if (skipped.Count > 0)
+        {
+            lines.Add($"Skipped {skipped.Count} {Files(skipped.Count)} it doesn't apply to: {Names(skipped)}");
+        }
+
+        return new NotificationText(title, string.Join(Environment.NewLine, lines));
+    }
+
     /// <summary>Shown instead of a conversion when nothing in the drop can become the chosen target (or anything at all).</summary>
     public static NotificationText NothingToConvert(IReadOnlyList<string> files, MediaFormat? target = null) =>
         files.Count == 0

@@ -17,7 +17,8 @@ using DragConvert.Core.Instance;
 using DragConvert.Core.Settings;
 using DragConvert.Native.Shell;
 using DragConvert.Native.Windowing;
-using DragConvert.Providers;
+using DragConvert.Core.Tools;
+using DragConvert.Providers.Windows;
 using DragConvert.Providers.Ffmpeg;
 using H.NotifyIcon;
 using Serilog;
@@ -101,8 +102,9 @@ public partial class App : Application
 
         string? ffmpeg = FfmpegLocator.Find();
         Log.Information("FFmpeg: {Path}", ffmpeg ?? "not found (audio and video conversions unavailable)");
-        var catalog = new FormatCatalog(DefaultProviders.Create(ffmpeg));
-        _coordinator = new ConversionCoordinator(catalog, _notifications, () => _settings, Dispatcher);
+        var catalog = new FormatCatalog(AllProviders.Converters(ffmpeg));
+        var tools = new ToolCatalog(AllProviders.Tools(ffmpeg));
+        _coordinator = new ConversionCoordinator(catalog, tools, _notifications, () => _settings, Dispatcher);
         _picker = new PickerWindow(_coordinator);
 
         _trayIcon = (TaskbarIcon)FindResource("TrayIcon");

@@ -1,4 +1,9 @@
 <Project>
+  <PropertyGroup>
+    <!-- Lets the pins below override vulnerable versions that packages bring in transitively. -->
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+
   <ItemGroup>
     <!-- App -->
     <PackageVersion Include="H.NotifyIcon.Wpf" Version="2.4.1" />
@@ -7,6 +12,9 @@
     <PackageVersion Include="Serilog.Sinks.File" Version="7.0.0" />
     <!-- Providers -->
     <PackageVersion Include="Magick.NET-Q8-AnyCPU" Version="14.17.2" />
+    <PackageVersion Include="PDFsharp" Version="6.2.4" />
+    <!-- Transitive pin: PDFsharp 6.2.4 references 8.0.1, which has known vulnerabilities (GHSA-2fmv-rv2c-59x7, GHSA-846f-f764-76mx). -->
+    <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
     <!-- Native -->
     <PackageVersion Include="Microsoft.Windows.CsWin32" Version="0.3.363" />
     <!-- Tests -->

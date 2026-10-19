@@ -1,13 +1,17 @@
 using System.Diagnostics;
 using DragConvert.Core.Conversion;
-using DragConvert.Providers;
+using DragConvert.Core.Tools;
 using DragConvert.Providers.Ffmpeg;
+using DragConvert.Providers.Windows;
 
 const string Usage = """
     Usage:
       dragconvert formats <file>...                     List the formats each file can be converted to
       dragconvert convert <file>... <format> [--out <dir>]
                                                         Convert files; output goes beside each file (or into <dir>)
+      dragconvert tool <tool-id> <file>... [--out <dir>]
+                                                        Run a tool: merge-pdf, split-pdf, pdf-to-images,
+                                                        compress-pdf, images-to-pdf, remove-metadata
     Formats are ids, names or extensions: jpeg, PNG, webp, mp3, mp4, gif, pdf...
     """;
 
@@ -18,7 +22,8 @@ if (args.Length < 2)
 }
 
 string? ffmpeg = FfmpegLocator.Find();
-var catalog = new FormatCatalog(DefaultProviders.Create(ffmpeg));
+var catalog = new FormatCatalog(AllProviders.Converters(ffmpeg));
+var toolCatalog = new ToolCatalog(AllProviders.Tools(ffmpeg));
 if (ffmpeg is null)
 {
     Console.Error.WriteLine("Note: ffmpeg.exe not found, so audio and video formats are unavailable (run tools/fetch-ffmpeg.ps1).");
@@ -31,6 +36,11 @@ switch (args[0].ToLowerInvariant())
         {
             IReadOnlyList<MediaFormat> targets = catalog.TargetsFor(file);
             Console.WriteLine($"{Path.GetFileName(file)}: {(targets.Count == 0 ? "(no conversions)" : string.Join(", ", targets.Select(t => t.DisplayName)))}");
+            IReadOnlyList<ToolOption> fileTools = toolCatalog.ToolOptionsFor([file]);
+            if (fileTools.Count > 0)
+            {
+                Console.WriteLine($"  tools: {string.Join(", ", fileTools.Select(t => t.Tool.Id))}");
+            }
         }
 
         if (args.Length > 2)
@@ -44,9 +54,56 @@ switch (args[0].ToLowerInvariant())
     case "convert":
         return await ConvertAsync(args.Skip(1).ToList());
 
+    case "tool":
+        return await RunToolAsync(args.Skip(1).ToList());
+
     default:
         Console.WriteLine(Usage);
         return 2;
+}
+
+async Task<int> RunToolAsync(List<string> rest)
+{
+    string? outputDirectory = TakeOut(rest);
+    IFileTool? tool = rest.Count > 0 ? toolCatalog.Tools.FirstOrDefault(t => t.Id.Equals(rest[0], StringComparison.OrdinalIgnoreCase)) : null;
+    if (tool is null || rest.Count < 2)
+    {
+        Console.Error.WriteLine($"Usage: dragconvert tool <{string.Join("|", toolCatalog.Tools.Select(t => t.Id))}> <file>...");
+        return 2;
+    }
+
+    var (accepted, skipped) = ToolCatalog.Plan(tool, rest.Skip(1));
+    foreach (string file in skipped)
+    {
+        Console.WriteLine($"SKIP {Path.GetFileName(file)}: {tool.DisplayName} doesn't apply");
+    }
+
+    using var runner = new ToolRunner();
+    var stopwatch = Stopwatch.StartNew();
+    IReadOnlyList<ToolResult> results = await runner.RunAsync(tool, accepted, outputDirectory: outputDirectory);
+    foreach (ToolResult result in results)
+    {
+        string inputs = string.Join(", ", result.Inputs.Select(Path.GetFileName));
+        Console.WriteLine(result.Status == ConversionStatus.Succeeded
+            ? $"OK   {inputs} -> {result.OutputPath} ({stopwatch.Elapsed.TotalSeconds:F1} s)"
+            : $"FAIL {inputs}: {result.Error}");
+    }
+
+    return results.All(r => r.Status == ConversionStatus.Succeeded) ? 0 : 1;
+}
+
+static string? TakeOut(List<string> rest)
+{
+    int outIndex = rest.FindIndex(a => a is "--out" or "-o");
+    if (outIndex < 0 || outIndex + 1 >= rest.Count)
+    {
+        return null;
+    }
+
+    string directory = Path.GetFullPath(rest[outIndex + 1]);
+    Directory.CreateDirectory(directory);
+    rest.RemoveRange(outIndex, 2);
+    return directory;
 }
 
 async Task<int> ConvertAsync(List<string> rest)

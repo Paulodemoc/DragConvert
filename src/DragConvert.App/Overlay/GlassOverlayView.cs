@@ -329,7 +329,7 @@ internal sealed class GlassOverlayView : OverlayView
         {
             StyleTile(_tileViews[tile], hovered: true);
             OverlayTile t = _tiles[tile];
-            _caption.Text = t.Detail is null ? $"Convert to {t.Label}" : $"{t.Label} for {t.Detail} files";
+            _caption.Text = t.Detail is null ? (t.Glyph is null ? $"Convert to {t.Label}" : t.Label) : $"{t.Label} for {t.Detail} files";
         }
         else
         {
@@ -467,7 +467,7 @@ internal sealed class GlassOverlayView : OverlayView
         var bubble = new Ellipse { Width = _bubble, Height = _bubble, StrokeThickness = 1.3 };
         var glyph = new TextBlock
         {
-            Text = OverlayTheme.Glyph(tile.Category),
+            Text = tile.Icon,
             FontFamily = OverlayTheme.IconFont,
             FontSize = OverlayTheme.Number("Glass.BubbleGlyphSize"),
             HorizontalAlignment = HorizontalAlignment.Center,
@@ -510,7 +510,8 @@ internal sealed class GlassOverlayView : OverlayView
             });
         }
 
-        var root = new Grid { Width = TileBox, Height = TileBox };
+        // Wider than the tile box so longer labels ("Remove metadata") fit; hit testing still uses the tile box.
+        var root = new Grid { Width = TileBox + 32, Height = TileBox };
         root.Children.Add(bubbleGrid);
         root.Children.Add(labels);
         AutomationProperties.SetName(root, tile.Detail is null ? $"Convert to {tile.Label}" : $"Convert {tile.Detail} files to {tile.Label}");

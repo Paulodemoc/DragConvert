@@ -29,6 +29,7 @@
   <ItemGroup>
     <ProjectReference Include="..\DragConvert.Core\DragConvert.Core.csproj" />
     <ProjectReference Include="..\DragConvert.Providers\DragConvert.Providers.csproj" />
+    <ProjectReference Include="..\DragConvert.Providers.Windows\DragConvert.Providers.Windows.csproj" />
     <ProjectReference Include="..\DragConvert.Native\DragConvert.Native.csproj" />
   </ItemGroup>
 

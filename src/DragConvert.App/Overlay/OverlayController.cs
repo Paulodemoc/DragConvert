@@ -7,6 +7,7 @@ using DragConvert.App.Theme;
 using DragConvert.Core.Conversion;
 using DragConvert.Core.Input;
 using DragConvert.Core.Overlay;
+using DragConvert.Core.Tools;
 using DragConvert.Native;
 using DragConvert.Native.Input;
 using DragConvert.Native.Windowing;
@@ -45,6 +46,8 @@ internal sealed class OverlayController : IDisposable
     private IReadOnlyList<string> _dragPaths = [];
     private DropSet? _dragSet;
     private IReadOnlyList<TargetOption> _options = [];
+    private IReadOnlyList<ToolOption> _toolOptions = [];
+    private bool _toolsMode;
 
     public OverlayController(Dispatcher dispatcher, OverlayRenderer renderer, ConversionCoordinator coordinator, ModifierChord chord)
     {
@@ -215,16 +218,24 @@ internal sealed class OverlayController : IDisposable
         }
 
         bool held = Chord.IsTriggerHeld(keys);
+        bool toolsMode = Chord.IsToolsMode(keys);
         if (!_visible)
         {
             if (held && !_escaped)
             {
+                _toolsMode = toolsMode;
                 Show(timestamp, fromHook);
             }
         }
         else if (!held && !CursorInOverlay())
         {
             Hide("trigger released");
+        }
+        else if (held && toolsMode != _toolsMode)
+        {
+            // Alt pressed or released while the ring is up: swap formats and tools.
+            _toolsMode = toolsMode;
+            ShowTiles();
         }
     }
 
@@ -263,6 +274,7 @@ internal sealed class OverlayController : IDisposable
         _dragPaths = [];
         _dragSet = null;
         _options = [];
+        _toolOptions = [];
     }
 
     private async void OnDragEntered(object? sender, DragPayload payload)
@@ -290,25 +302,17 @@ internal sealed class OverlayController : IDisposable
 
             _dragSet = set;
             _options = _coordinator.Catalog.TargetOptionsFor(set.Files);
-            Logger.Information("Drag has {Description}; {Count} target(s): {Targets}", Describe(set), _options.Count, _options.Select(o => $"{o.Target.DisplayName} {o.FileCount}/{o.TotalFiles}"));
+            _toolOptions = _coordinator.Tools.ToolOptionsFor(set.Files);
+            Logger.Information(
+                "Drag has {Description}; {Count} target(s): {Targets}; {ToolCount} tool(s)",
+                Describe(set),
+                _options.Count,
+                _options.Select(o => $"{o.Target.DisplayName} {o.FileCount}/{o.TotalFiles}"),
+                _toolOptions.Count);
 
             MediaCategory[] categories = set.Files.Select(f => MediaFormats.FromPath(f)?.Category).OfType<MediaCategory>().Distinct().ToArray();
             _overlay.View.SetBadge(categories.Length == 1 ? categories[0] : null, set.Files.Count);
-            if (_options.Count == 0)
-            {
-                _overlay.View.SetTiles([], set.Files.Count == 0 ? "No files in this drag" : "Nothing here can be converted");
-                return;
-            }
-
-            IEnumerable<OverlayTile> tiles = _options.Take(OverlayModel.MaxTiles)
-                .Select(o => new OverlayTile(o.Target.DisplayName, o.AppliesToAll ? null : $"{o.FileCount} of {o.TotalFiles}", o.Target.Category));
-            string summary = Describe(set);
-            if (_options.Count > OverlayModel.MaxTiles)
-            {
-                summary += $" · {_options.Count - OverlayModel.MaxTiles} more formats in the tray window";
-            }
-
-            _overlay.View.SetTiles(tiles.ToList(), summary);
+            ShowTiles();
         }
         catch (OperationCanceledException)
         {
@@ -320,17 +324,77 @@ internal sealed class OverlayController : IDisposable
         }
     }
 
+    /// <summary>Puts the formats (or, with Alt held, the tools) for the current drag on the ring.</summary>
+    private void ShowTiles()
+    {
+        if (_dragSet is not { } set)
+        {
+            return;
+        }
+
+        string files = Describe(set);
+        if (_toolsMode)
+        {
+            if (_toolOptions.Count == 0)
+            {
+                _overlay.View.SetTiles([], "No tools for these files");
+                return;
+            }
+
+            _overlay.View.SetTiles(
+                _toolOptions.Take(OverlayModel.MaxTiles)
+                    .Select(o => new OverlayTile(o.Tool.DisplayName, o.AppliesToAll ? null : $"{o.FileCount} of {o.TotalFiles}", MediaCategory.Document, o.Tool.Glyph))
+                    .ToList(),
+                $"Tools · {files}");
+            return;
+        }
+
+        if (_options.Count == 0)
+        {
+            _overlay.View.SetTiles([], set.Files.Count == 0 ? "No files in this drag" : _toolOptions.Count > 0 ? "No conversions · hold Alt for tools" : "Nothing here can be converted");
+            return;
+        }
+
+        string summary = files;
+        if (_options.Count > OverlayModel.MaxTiles)
+        {
+            summary += $" · {_options.Count - OverlayModel.MaxTiles} more in the tray window";
+        }
+
+        if (_toolOptions.Count > 0)
+        {
+            summary += " · Alt for tools";
+        }
+
+        _overlay.View.SetTiles(
+            _options.Take(OverlayModel.MaxTiles)
+                .Select(o => new OverlayTile(o.Target.DisplayName, o.AppliesToAll ? null : $"{o.FileCount} of {o.TotalFiles}", o.Target.Category))
+                .ToList(),
+            summary);
+    }
+
     private async void OnTileDropped(object? sender, int tile)
     {
-        if (tile < 0 || tile >= _options.Count)
+        int count = _toolsMode ? _toolOptions.Count : _options.Count;
+        if (tile < 0 || tile >= count)
         {
             Hide("dropped outside the tiles");
             return;
         }
 
-        MediaFormat target = _options[tile].Target;
-        Logger.Information("Dropped on {Target}", target);
-        Task<BatchOutcome> batch = _coordinator.ConvertAsync(_dragPaths, target, _dragSet, quietIfFast: true);
+        Task<BatchOutcome> batch;
+        if (_toolsMode)
+        {
+            IFileTool tool = _toolOptions[tile].Tool;
+            Logger.Information("Dropped on tool {Tool}", tool.Id);
+            batch = _coordinator.RunToolAsync(_dragPaths, tool, _dragSet, quietIfFast: true);
+        }
+        else
+        {
+            MediaFormat target = _options[tile].Target;
+            Logger.Information("Dropped on {Target}", target);
+            batch = _coordinator.ConvertAsync(_dragPaths, target, _dragSet, quietIfFast: true);
+        }
 
         // The overlay turns into a status bubble at the dropped tile: spinner, then a check mark or a cross.
         _dropWait.Stop();
