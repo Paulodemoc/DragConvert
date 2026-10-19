@@ -11,6 +11,9 @@
             </tb:TaskbarIcon.IconSource>
             <tb:TaskbarIcon.ContextMenu>
                 <ContextMenu>
+                    <MenuItem x:Name="RendererItem" Header="Renderer" IsEnabled="False" />
+                    <MenuItem Header="Open log folder" Click="OnOpenLogFolderClick" />
+                    <Separator />
                     <MenuItem Header="Quit" Click="OnQuitClick" />
                 </ContextMenu>
             </tb:TaskbarIcon.ContextMenu>

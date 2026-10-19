@@ -10,6 +10,9 @@
 
   <ItemGroup>
     <PackageReference Include="H.NotifyIcon.Wpf" />
+    <PackageReference Include="Serilog" />
+    <PackageReference Include="Serilog.Sinks.Console" />
+    <PackageReference Include="Serilog.Sinks.File" />
   </ItemGroup>
 
   <ItemGroup>

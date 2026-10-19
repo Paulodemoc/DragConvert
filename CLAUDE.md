@@ -19,8 +19,9 @@ C# 14, .NET 10, WPF (Fluent theme), CsWin32. Solution in src/, tests in tests/.
 - Build: dotnet build DragConvert.slnx
 - Test: dotnet test DragConvert.slnx
 - Smoke run (starts and exits): DragConvert.exe --smoke
-- Run app: dotnet run --project src/DragConvert.App
+- Run app: dotnet run --project src/DragConvert.App -- --console [--renderer=layered|dwm]
+- Logs: %LOCALAPPDATA%\DragConvert\logs
 
 ## Current milestone
 See docs/design.md, Implementation plan. Work on one milestone at a time.
-Status: M0 (repo, solution, CI) done locally; CI not yet run on GitHub. Next: M1 spike.
+Status: M1 spike code done (hook thread, key polling, overlay with layered/dwm renderers, logging). Waiting on the user to run docs/test-matrix.md; then write docs/decisions/0001-drag-detection.md.
