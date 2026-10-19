@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.Security.Principal;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
@@ -41,6 +42,15 @@ public partial class App : Application
             rendererItem.Header = $"Renderer: {options.Renderer.ToString().ToLowerInvariant()}";
         }
 
+        if (IsElevated())
+        {
+            // UIPI blocks drag-and-drop from normal-integrity apps (Explorer, browsers) into an elevated process.
+            Log.Warning("Running elevated (as administrator): drops from normal apps such as Explorer will be blocked by Windows");
+            _trayIcon.ShowNotification(
+                "DragConvert is running as administrator",
+                "Windows blocks drops from normal apps like Explorer. Restart DragConvert without administrator rights.");
+        }
+
         _overlay = new OverlayController(Dispatcher, options.Renderer);
         _overlay.Start();
         Log.Information("Startup finished in {Ms:F0} ms", Stopwatch.GetElapsedTime(startTimestamp).TotalMilliseconds);
@@ -59,6 +69,12 @@ public partial class App : Application
         _trayIcon?.Dispose();
         Log.CloseAndFlush();
         base.OnExit(e);
+    }
+
+    private static bool IsElevated()
+    {
+        using var identity = WindowsIdentity.GetCurrent();
+        return new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator);
     }
 
     private static void ConfigureLogging(bool console)

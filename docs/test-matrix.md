@@ -13,7 +13,7 @@ Hooks, the overlay and drag-and-drop can't be unit tested reliably, so this chec
 3. The same log is written to `%LOCALAPPDATA%\DragConvert\logs\` (tray icon → Open log folder).
 4. Quit from the tray icon (right-click → Quit) before switching renderer.
 
-Run the app **non-elevated**, like a normal user would.
+Run the app **non-elevated**, like a normal user would. Windows (UIPI) blocks drag-and-drop from normal apps into an elevated process: the cursor shows a crossed circle and no `DragEnter` is logged. An app started from an elevated terminal (including an elevated Claude Code session) inherits elevation, so start it by double-clicking `tools\run-spike.cmd` (layered) or `tools\run-spike-dwm.cmd` in Explorer. If it is elevated anyway, the log shows a warning and the tray shows a notification.
 
 ### The gesture
 
