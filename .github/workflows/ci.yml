@@ -36,7 +36,7 @@ jobs:
       - name: Smoke-run the app
         shell: pwsh
         run: |
-          $p = Start-Process -FilePath "src/DragConvert.App/bin/Release/net10.0-windows/DragConvert.exe" -ArgumentList "--smoke" -PassThru
+          $p = Start-Process -FilePath "src/DragConvert.App/bin/Release/net10.0-windows10.0.19041.0/DragConvert.exe" -ArgumentList "--smoke" -PassThru
           if (-not $p.WaitForExit(30000)) { $p.Kill(); throw "App did not exit within 30 s" }
           if ($p.ExitCode -ne 0) { throw "App exited with code $($p.ExitCode)" }
 

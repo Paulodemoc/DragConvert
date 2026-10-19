@@ -17,54 +17,56 @@ namespace DragConvert.App.Overlay;
 
 public enum OverlayRenderer
 {
-    /// <summary>Per-pixel transparent window (AllowsTransparency): a true ring with a click-through centre.</summary>
+    /// <summary>Per-pixel transparent window (AllowsTransparency): a true ring shape.</summary>
     Layered,
 
     /// <summary>Opaque borderless window with a DWM system backdrop (acrylic) and rounded corners.</summary>
     Dwm,
 }
 
-internal sealed record DropPayload(
-    int TileIndex,
-    string? TileLabel,
+/// <summary>One tile: its label and an optional second line such as "3 of 5".</summary>
+internal sealed record OverlayTile(string Label, string? Detail = null);
+
+/// <summary>What the drag carries, read once when it first enters the overlay.</summary>
+internal sealed record DragPayload(
     IReadOnlyList<string> Paths,
     IReadOnlyList<string> VirtualFileNames,
-    IReadOnlyList<string> Formats);
+    IReadOnlyList<string> Formats,
+    DragDropEffects AllowedEffects);
 
 /// <summary>
-/// The drag overlay: a ring of tiles drawn from <see cref="OverlayModel"/>. Created hidden at startup and only
-/// moved and shown afterwards. Never activates. WPF's AllowDrop registers it as an OLE drop target.
+/// The drag overlay: a ring of tiles drawn from <see cref="OverlayModel"/>. Created hidden at startup and only moved
+/// and shown afterwards; never activates. WPF's AllowDrop registers it as an OLE drop target. The whole disc, centre
+/// included, is hit-testable so Windows reports the dragged files as soon as the ring appears under the cursor.
 /// </summary>
 internal sealed class OverlayWindow : Window
 {
-    // Placeholder tile sets for the spike; M3 fills tiles from FormatCatalog.
-    private static readonly string[] FormatLabels = ["JPEG", "PNG", "WebP", "PDF", "MP3", "MP4", "GIF", "WAV"];
-    private static readonly string[] ToolLabels = ["Compress", "Strip EXIF", "Split PDF", "Merge", "Resize", "Rotate"];
-
     private const double CaptionHeight = 28;
 
     private static readonly ILogger Logger = Log.ForContext<OverlayWindow>();
 
     private readonly OverlayRenderer _renderer;
     private readonly bool _dark;
+    private readonly double _outerRadius;
     private readonly Canvas _root = new() { Background = Brushes.Transparent };
     private readonly Canvas _ring = new();
     private readonly TextBlock _caption;
     private readonly ScaleTransform _ringScale = new(1, 1);
-    private readonly List<Border> _tiles = [];
-    private OverlayModel _model = new(FormatLabels.Length);
-    private string[] _labels = [];
+    private readonly List<Border> _tileViews = [];
+    private OverlayModel? _model;
+    private IReadOnlyList<OverlayTile> _tiles = [];
     private int _hovered = -1;
-    private string _dragSummary = string.Empty;
+    private string _summary = string.Empty;
     private (int X, int Y) _anchor;
-    private bool _dragEntered;
+    private DragPayload? _payload;
 
     public OverlayWindow(OverlayRenderer renderer)
     {
         _renderer = renderer;
         _dark = IsSystemDarkTheme();
+        _outerRadius = new OverlayModel(OverlayModel.MaxTiles).OuterRadius;
 
-        double diameter = 2 * _model.OuterRadius;
+        double diameter = 2 * _outerRadius;
         Width = diameter;
         Height = diameter + CaptionHeight;
         WindowStyle = WindowStyle.None;
@@ -74,15 +76,14 @@ internal sealed class OverlayWindow : Window
         Topmost = true;
         AllowDrop = true;
         Title = "DragConvert overlay";
+        Background = Brushes.Transparent;
 
         if (renderer == OverlayRenderer.Layered)
         {
             AllowsTransparency = true;
-            Background = Brushes.Transparent;
         }
         else
         {
-            Background = Brushes.Transparent;
             WindowChrome.SetWindowChrome(this, new WindowChrome
             {
                 CaptionHeight = 0,
@@ -98,7 +99,7 @@ internal sealed class OverlayWindow : Window
             TextAlignment = TextAlignment.Center,
             FontFamily = new FontFamily("Segoe UI Variable Text, Segoe UI"),
             FontSize = 12,
-            Foreground = _dark ? Brushes.White : new SolidColorBrush(Color.FromRgb(0x1A, 0x1A, 0x1A)),
+            Foreground = TextBrush,
             TextTrimming = TextTrimming.CharacterEllipsis,
             Padding = new Thickness(8, 4, 8, 4),
         };
@@ -109,33 +110,35 @@ internal sealed class OverlayWindow : Window
         _ring.RenderTransformOrigin = new Point(0.5, 0.5);
         _ring.RenderTransform = _ringScale;
 
-        // In the layered renderer, alpha-0 pixels are invisible to OS hit testing, so drops in the dead zone fall
-        // through to the window underneath. A nearly transparent annulus keeps the gaps between tiles hittable.
+        // Alpha-0 pixels of a layered window are invisible to OS hit testing; a nearly transparent disc keeps the
+        // whole ring, centre included, a drop target.
         if (renderer == OverlayRenderer.Layered)
         {
-            double r = _model.OuterRadius;
-            var annulus = new CombinedGeometry(
-                GeometryCombineMode.Exclude,
-                new EllipseGeometry(new Point(r, r), r, r),
-                new EllipseGeometry(new Point(r, r), _model.DeadZoneRadius, _model.DeadZoneRadius));
-            _ring.Children.Add(new System.Windows.Shapes.Path { Data = annulus, Fill = new SolidColorBrush(Color.FromArgb(1, 0, 0, 0)) });
+            _ring.Children.Add(new System.Windows.Shapes.Ellipse
+            {
+                Width = diameter,
+                Height = diameter,
+                Fill = new SolidColorBrush(Color.FromArgb(1, 0, 0, 0)),
+            });
         }
 
         _root.Children.Add(_ring);
         _root.Children.Add(_caption);
         Content = _root;
-
-        SetTiles(FormatLabels);
         SourceInitialized += OnSourceInitialized;
     }
 
-    public event EventHandler<DropPayload>? Dropped;
+    /// <summary>Raised once per show, when the drag first enters the overlay.</summary>
+    public event EventHandler<DragPayload>? DragEntered;
+
+    /// <summary>Raised on drop with the tile index (-1 outside the tiles).</summary>
+    public event EventHandler<int>? TileDropped;
 
     public nint Handle { get; private set; }
 
     public bool BackdropApplied { get; private set; }
 
-    public bool IsToolsMode { get; private set; }
+    private Brush TextBrush => _dark ? Brushes.White : new SolidColorBrush(Color.FromRgb(0x1A, 0x1A, 0x1A));
 
     /// <summary>Creates the HWND without showing the window, so the first real show only moves and shows it.</summary>
     public void Prepare() => new WindowInteropHelper(this).EnsureHandle();
@@ -143,24 +146,25 @@ internal sealed class OverlayWindow : Window
     /// <summary>Renders one frame off-screen so the first real show doesn't pay for first-render setup.</summary>
     public void WarmUp(Action? completed = null)
     {
+        SetTiles([new OverlayTile("JPEG"), new OverlayTile("PNG", "1 of 2")]);
         OverlayWindowInterop.MoveTo(Handle, -20000, -20000);
         Show();
         Dispatcher.BeginInvoke(
             () =>
             {
                 Hide();
+                SetTiles([]);
                 completed?.Invoke();
             },
             DispatcherPriority.ContextIdle);
     }
 
-    public void ShowAt(int x, int y, bool toolsMode)
+    public void ShowAt(int x, int y)
     {
-        SetToolsMode(toolsMode);
-        SetHovered(-1);
-        _dragSummary = string.Empty;
-        _dragEntered = false;
-        _caption.Text = toolsMode ? "Drop on a tool" : "Drop on a format";
+        SetTiles([]);
+        _payload = null;
+        _summary = string.Empty;
+        _caption.Text = string.Empty;
         _anchor = (x, y);
 
         OverlayWindowInterop.CenterOnPoint(Handle, x, y);
@@ -172,18 +176,79 @@ internal sealed class OverlayWindow : Window
         AnimateIn();
     }
 
-    public void SetToolsMode(bool toolsMode)
+    /// <summary>Replaces the tiles (at most <see cref="OverlayModel.MaxTiles"/>) and the caption shown when no tile is hovered.</summary>
+    public void SetTiles(IReadOnlyList<OverlayTile> tiles, string? summary = null)
     {
-        if (toolsMode == IsToolsMode && _labels.Length > 0)
+        foreach (Border view in _tileViews)
+        {
+            _ring.Children.Remove(view);
+        }
+
+        _tileViews.Clear();
+        _tiles = tiles.Take(OverlayModel.MaxTiles).ToList();
+        _model = _tiles.Count > 0 ? new OverlayModel(_tiles.Count) : null;
+        _hovered = -1;
+        _summary = summary ?? string.Empty;
+        _caption.Text = _summary;
+
+        if (_model is null)
         {
             return;
         }
 
-        IsToolsMode = toolsMode;
-        SetTiles(toolsMode ? ToolLabels : FormatLabels);
-        if (IsVisible && string.IsNullOrEmpty(_dragSummary))
+        var tileBrush = new SolidColorBrush(_dark ? Color.FromArgb(0xE6, 0x2B, 0x2B, 0x2B) : Color.FromArgb(0xF2, 0xFB, 0xFB, 0xFB));
+        Brush text = TextBrush;
+        for (int i = 0; i < _tiles.Count; i++)
         {
-            _caption.Text = toolsMode ? "Drop on a tool" : "Drop on a format";
+            var (cx, cy) = _model.TileCenter(i);
+            var stack = new StackPanel { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
+            stack.Children.Add(new TextBlock
+            {
+                Text = _tiles[i].Label,
+                Foreground = text,
+                FontFamily = new FontFamily("Segoe UI Variable Text, Segoe UI"),
+                FontSize = 12,
+                FontWeight = FontWeights.SemiBold,
+                TextAlignment = TextAlignment.Center,
+            });
+            if (_tiles[i].Detail is { } detail)
+            {
+                stack.Children.Add(new TextBlock
+                {
+                    Text = detail,
+                    Foreground = text,
+                    Opacity = 0.7,
+                    FontFamily = new FontFamily("Segoe UI Variable Small, Segoe UI"),
+                    FontSize = 10,
+                    TextAlignment = TextAlignment.Center,
+                });
+            }
+
+            var view = new Border
+            {
+                Width = _model.TileSize,
+                Height = _model.TileSize,
+                CornerRadius = new CornerRadius(8),
+                Background = tileBrush,
+                BorderThickness = new Thickness(2),
+                BorderBrush = Brushes.Transparent,
+                RenderTransformOrigin = new Point(0.5, 0.5),
+                RenderTransform = new ScaleTransform(1, 1),
+                Child = stack,
+            };
+            Canvas.SetLeft(view, _outerRadius + cx - (_model.TileSize / 2));
+            Canvas.SetTop(view, _outerRadius + cy - (_model.TileSize / 2));
+            _tileViews.Add(view);
+            _ring.Children.Add(view);
+        }
+    }
+
+    public void SetCaption(string text)
+    {
+        _summary = text;
+        if (_hovered < 0)
+        {
+            _caption.Text = text;
         }
     }
 
@@ -203,28 +268,18 @@ internal sealed class OverlayWindow : Window
         base.OnDragEnter(e);
 
         // DragEnter bubbles up from every tile the cursor crosses; read the data once per show.
-        if (_dragEntered)
+        if (_payload is null)
         {
-            UpdateHover(e);
-            e.Handled = true;
-            return;
+            _payload = new DragPayload(SafePaths(e.Data), SafeVirtualNames(e.Data), SafeFormats(e.Data), e.AllowedEffects);
+            Logger.Information(
+                "DragEnter: allowed {Allowed}; {PathCount} path(s); {VirtualCount} virtual file(s); formats {Formats}",
+                _payload.AllowedEffects,
+                _payload.Paths.Count,
+                _payload.VirtualFileNames.Count,
+                _payload.Formats);
+            DragEntered?.Invoke(this, _payload);
         }
 
-        _dragEntered = true;
-        IReadOnlyList<string> formats = SafeFormats(e.Data);
-        IReadOnlyList<string> paths = SafePaths(e.Data);
-        IReadOnlyList<string> virtualNames = SafeVirtualNames(e.Data);
-
-        Logger.Information(
-            "DragEnter: allowed {Allowed}; {PathCount} path(s) {Paths}; {VirtualCount} virtual file(s) {VirtualNames}; formats {Formats}",
-            e.AllowedEffects,
-            paths.Count,
-            paths,
-            virtualNames.Count,
-            virtualNames,
-            formats);
-
-        _dragSummary = Summarize(paths.Count > 0 ? paths : virtualNames);
         UpdateHover(e);
         e.Handled = true;
     }
@@ -240,8 +295,6 @@ internal sealed class OverlayWindow : Window
     {
         base.OnDragLeave(e);
         SetHovered(-1);
-        _caption.Text = _dragSummary;
-        Logger.Debug("DragLeave");
         e.Handled = true;
     }
 
@@ -249,15 +302,9 @@ internal sealed class OverlayWindow : Window
     {
         base.OnDrop(e);
         int tile = HitTest(e);
-        var payload = new DropPayload(
-            tile,
-            tile >= 0 ? _labels[tile] : null,
-            SafePaths(e.Data),
-            SafeVirtualNames(e.Data),
-            SafeFormats(e.Data));
         e.Effects = tile >= 0 ? ChooseEffect(e.AllowedEffects) : DragDropEffects.None;
         e.Handled = true;
-        Dropped?.Invoke(this, payload);
+        TileDropped?.Invoke(this, tile);
     }
 
     private static bool IsSystemDarkTheme()
@@ -271,22 +318,6 @@ internal sealed class OverlayWindow : Window
         allowed.HasFlag(DragDropEffects.Copy) ? DragDropEffects.Copy
         : allowed.HasFlag(DragDropEffects.Link) ? DragDropEffects.Link
         : DragDropEffects.None;
-
-    private static string Summarize(IReadOnlyList<string> names)
-    {
-        if (names.Count == 0)
-        {
-            return "No files in this drag";
-        }
-
-        string[] extensions = names
-            .Select(n => System.IO.Path.GetExtension(n).ToUpperInvariant())
-            .Where(x => x.Length > 0)
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
-        string kinds = extensions.Length == 0 ? string.Empty : $" · {string.Join(", ", extensions)}";
-        return names.Count == 1 ? $"{System.IO.Path.GetFileName(names[0])}" : $"{names.Count} files{kinds}";
-    }
 
     private static IReadOnlyList<string> SafeFormats(IDataObject data)
     {
@@ -350,58 +381,15 @@ internal sealed class OverlayWindow : Window
         }
     }
 
-    private void SetTiles(string[] labels)
-    {
-        foreach (Border tile in _tiles)
-        {
-            _ring.Children.Remove(tile);
-        }
-
-        _tiles.Clear();
-        _labels = labels;
-        _model = new OverlayModel(labels.Length);
-        _hovered = -1;
-
-        var tileBrush = new SolidColorBrush(_dark ? Color.FromArgb(0xE6, 0x2B, 0x2B, 0x2B) : Color.FromArgb(0xF2, 0xFB, 0xFB, 0xFB));
-        var textBrush = _dark ? Brushes.White : new SolidColorBrush(Color.FromRgb(0x1A, 0x1A, 0x1A));
-        double r = _model.OuterRadius;
-
-        for (int i = 0; i < labels.Length; i++)
-        {
-            var (cx, cy) = _model.TileCenter(i);
-            var tile = new Border
-            {
-                Width = _model.TileSize,
-                Height = _model.TileSize,
-                CornerRadius = new CornerRadius(8),
-                Background = tileBrush,
-                BorderThickness = new Thickness(2),
-                BorderBrush = Brushes.Transparent,
-                RenderTransformOrigin = new Point(0.5, 0.5),
-                RenderTransform = new ScaleTransform(1, 1),
-                Child = new TextBlock
-                {
-                    Text = labels[i],
-                    Foreground = textBrush,
-                    FontFamily = new FontFamily("Segoe UI Variable Text, Segoe UI"),
-                    FontSize = 11,
-                    TextWrapping = TextWrapping.Wrap,
-                    TextAlignment = TextAlignment.Center,
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center,
-                },
-            };
-            Canvas.SetLeft(tile, r + cx - (_model.TileSize / 2));
-            Canvas.SetTop(tile, r + cy - (_model.TileSize / 2));
-            _tiles.Add(tile);
-            _ring.Children.Add(tile);
-        }
-    }
-
     private int HitTest(DragEventArgs e)
     {
+        if (_model is null)
+        {
+            return -1;
+        }
+
         Point p = e.GetPosition(_ring);
-        return _model.HitTest(p.X - _model.OuterRadius, p.Y - _model.OuterRadius);
+        return _model.HitTest(p.X - _outerRadius, p.Y - _outerRadius);
     }
 
     private void UpdateHover(DragEventArgs e)
@@ -409,7 +397,6 @@ internal sealed class OverlayWindow : Window
         int tile = HitTest(e);
         SetHovered(tile);
         e.Effects = tile >= 0 ? ChooseEffect(e.AllowedEffects) : DragDropEffects.None;
-        _caption.Text = tile >= 0 ? $"{_labels[tile]}, same folder" : _dragSummary;
     }
 
     private void SetHovered(int tile)
@@ -419,17 +406,22 @@ internal sealed class OverlayWindow : Window
             return;
         }
 
-        if (_hovered >= 0 && _hovered < _tiles.Count)
+        if (_hovered >= 0 && _hovered < _tileViews.Count)
         {
-            _tiles[_hovered].BorderBrush = Brushes.Transparent;
-            AnimateScale((ScaleTransform)_tiles[_hovered].RenderTransform, 1.0, 100);
+            _tileViews[_hovered].BorderBrush = Brushes.Transparent;
+            AnimateScale((ScaleTransform)_tileViews[_hovered].RenderTransform, 1.0, 100);
         }
 
         _hovered = tile;
         if (tile >= 0)
         {
-            _tiles[tile].BorderBrush = new SolidColorBrush(SystemParameters.WindowGlassColor);
-            AnimateScale((ScaleTransform)_tiles[tile].RenderTransform, 1.06, 100);
+            _tileViews[tile].BorderBrush = new SolidColorBrush(SystemParameters.WindowGlassColor);
+            AnimateScale((ScaleTransform)_tileViews[tile].RenderTransform, 1.06, 100);
+            _caption.Text = $"{_tiles[tile].Label}{(_tiles[tile].Detail is { } d ? $" ({d})" : string.Empty)}";
+        }
+        else
+        {
+            _caption.Text = _summary;
         }
     }
 

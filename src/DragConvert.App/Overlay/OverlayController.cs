@@ -1,7 +1,11 @@
 using System.Diagnostics;
+using System.IO;
 using System.Windows.Media;
 using System.Windows.Threading;
+using DragConvert.App.Conversion;
+using DragConvert.Core.Conversion;
 using DragConvert.Core.Input;
+using DragConvert.Core.Overlay;
 using DragConvert.Native;
 using DragConvert.Native.Input;
 using DragConvert.Native.Windowing;
@@ -10,8 +14,9 @@ using Serilog;
 namespace DragConvert.App.Overlay;
 
 /// <summary>
-/// Ties the mouse hook, key polling and overlay together on the UI thread.
-/// Shows the overlay while a drag is active and the trigger chord is held; hides it on release, Esc or drop.
+/// Ties the mouse hook, key polling, overlay and conversions together on the UI thread. Shows the overlay while a
+/// drag is active and the trigger chord is held, fills its tiles from the format catalog once the drag's files are
+/// known, and hands a drop on a tile to the <see cref="ConversionCoordinator"/>.
 /// </summary>
 internal sealed class OverlayController : IDisposable
 {
@@ -20,22 +25,31 @@ internal sealed class OverlayController : IDisposable
     private static readonly TimeSpan DropWait = TimeSpan.FromMilliseconds(500);
 
     private readonly Dispatcher _dispatcher;
+    private readonly ConversionCoordinator _coordinator;
     private readonly OverlayWindow _overlay;
     private readonly MouseHookThread _hook;
     private readonly DispatcherTimer _poll;
     private readonly DispatcherTimer _dropWait;
-    private readonly ModifierChord _chord = ModifierChord.Default;
     private bool _dragActive;
     private bool _escaped;
     private bool _visible;
     private int _showCount;
 
-    public OverlayController(Dispatcher dispatcher, OverlayRenderer renderer)
+    // State for the drag currently over the overlay.
+    private CancellationTokenSource? _dragCts;
+    private IReadOnlyList<string> _dragPaths = [];
+    private DropSet? _dragSet;
+    private IReadOnlyList<TargetOption> _options = [];
+
+    public OverlayController(Dispatcher dispatcher, OverlayRenderer renderer, ConversionCoordinator coordinator, ModifierChord chord)
     {
         _dispatcher = dispatcher;
+        _coordinator = coordinator;
         Renderer = renderer;
+        Chord = chord;
         _overlay = new OverlayWindow(renderer);
-        _overlay.Dropped += OnDropped;
+        _overlay.DragEntered += OnDragEntered;
+        _overlay.TileDropped += OnTileDropped;
         _hook = new MouseHookThread(OnHookSignal);
         _poll = new DispatcherTimer(PollInterval, DispatcherPriority.Input, (_, _) => Evaluate(Stopwatch.GetTimestamp(), fromHook: false), dispatcher);
         _poll.Stop();
@@ -44,6 +58,12 @@ internal sealed class OverlayController : IDisposable
     }
 
     public OverlayRenderer Renderer { get; }
+
+    /// <summary>The trigger chord; <see cref="Modifiers.None"/> means the overlay never shows.</summary>
+    public ModifierChord Chord { get; set; }
+
+    /// <summary>When paused, drags are ignored (the hook stays installed but does nothing).</summary>
+    public bool Paused { get; set; }
 
     public void Start()
     {
@@ -61,7 +81,7 @@ internal sealed class OverlayController : IDisposable
         _hook.Start();
         if (_hook.IsInstalled)
         {
-            Logger.Information("Mouse hook installed; drag threshold {X}x{Y} px; trigger {Trigger}, tools {Tools}", DragMetrics.ThresholdX, DragMetrics.ThresholdY, _chord.Trigger, _chord.ToolsModifier);
+            Logger.Information("Mouse hook installed; drag threshold {X}x{Y} px; trigger {Trigger}", DragMetrics.ThresholdX, DragMetrics.ThresholdY, Chord.Trigger);
         }
         else
         {
@@ -73,6 +93,8 @@ internal sealed class OverlayController : IDisposable
     {
         _poll.Stop();
         _dropWait.Stop();
+        _dragCts?.Cancel();
+        _dragCts?.Dispose();
         _hook.Dispose();
         _overlay.Close();
     }
@@ -80,7 +102,18 @@ internal sealed class OverlayController : IDisposable
     private static string MemorySummary()
     {
         using var process = Process.GetCurrentProcess();
-        return $"working set {process.WorkingSet64 / (1024.0 * 1024):F1} MB, private {process.PrivateMemorySize64 / (1024.0 * 1024):F1} MB, managed {GC.GetTotalMemory(false) / (1024.0 * 1024):F1} MB";
+        return $"working set {process.WorkingSet64 / (1024.0 * 1024):F1} MB, private {process.PrivateMemorySize64 / (1024.0 * 1024):F1} MB";
+    }
+
+    private static string Describe(DropSet set)
+    {
+        if (set.Files.Count == 1 && set.FolderCount == 0)
+        {
+            return Path.GetFileName(set.Files[0]);
+        }
+
+        string files = $"{set.Files.Count:N0}{(set.Truncated ? "+" : string.Empty)} file{(set.Files.Count == 1 ? string.Empty : "s")}";
+        return set.FolderCount == 0 ? files : $"{files} in {set.FolderCount} folder{(set.FolderCount == 1 ? string.Empty : "s")}";
     }
 
     /// <summary>Runs on the hook thread: only posts to the UI thread.</summary>
@@ -88,19 +121,22 @@ internal sealed class OverlayController : IDisposable
 
     private void HandleSignal(DragSignal signal)
     {
+        if (Paused)
+        {
+            return;
+        }
+
         switch (signal.Transition)
         {
             case DragTransition.Started:
                 _dragActive = true;
                 _escaped = false;
-                Logger.Debug("Drag started at {X},{Y}; drag image visible {DragImage}", signal.X, signal.Y, OverlayWindowInterop.IsDragImageVisible());
                 _poll.Start();
                 Evaluate(signal.Timestamp, fromHook: true);
                 break;
 
             case DragTransition.Ended:
                 _dragActive = false;
-                Logger.Debug("Drag ended at {X},{Y}", signal.X, signal.Y);
                 if (_visible)
                 {
                     if (CursorInOverlay())
@@ -146,48 +182,39 @@ internal sealed class OverlayController : IDisposable
             return;
         }
 
-        bool held = _chord.IsTriggerHeld(keys);
+        bool held = Chord.IsTriggerHeld(keys);
         if (!_visible)
         {
             if (held && !_escaped)
             {
-                Show(timestamp, _chord.IsToolsMode(keys), fromHook);
+                Show(timestamp, fromHook);
             }
         }
         else if (!held && !CursorInOverlay())
         {
             Hide("trigger released");
         }
-        else if (held)
-        {
-            _overlay.SetToolsMode(_chord.IsToolsMode(keys));
-        }
     }
 
-    private void Show(long triggerTimestamp, bool toolsMode, bool fromHook)
+    private void Show(long triggerTimestamp, bool fromHook)
     {
         var (x, y) = OverlayWindowInterop.GetCursorPosition();
-        _overlay.ShowAt(x, y, toolsMode);
+        ResetDragState();
+        _overlay.ShowAt(x, y);
         _visible = true;
         int showNumber = ++_showCount;
-        double showCallMs = Stopwatch.GetElapsedTime(triggerTimestamp).TotalMilliseconds;
-        bool dragImage = OverlayWindowInterop.IsDragImageVisible();
 
         void OnFirstFrame(object? sender, EventArgs e)
         {
             CompositionTarget.Rendering -= OnFirstFrame;
             double firstFrameMs = Stopwatch.GetElapsedTime(triggerTimestamp).TotalMilliseconds;
             Logger.Information(
-                "Overlay shown #{Count} at {X},{Y} ({Mode}): {FirstFrame:F1} ms to first frame, {ShowCall:F1} ms to Show(); measured from {Origin}; drag image visible {DragImage}; DPI scale {Dpi}; {Memory}{Warning}",
+                "Overlay shown #{Count} at {X},{Y}: {FirstFrame:F1} ms to first frame (from {Origin}); {Memory}{Warning}",
                 showNumber,
                 x,
                 y,
-                toolsMode ? "tools" : "formats",
                 firstFrameMs,
-                showCallMs,
-                fromHook ? "drag start (trigger already held)" : "trigger detected by key poll (up to 10 ms after the press)",
-                dragImage,
-                VisualTreeHelperDpi(),
+                fromHook ? "drag start" : "key poll",
                 MemorySummary(),
                 firstFrameMs > 150 ? " — OVER the 150 ms target" : string.Empty);
         }
@@ -195,7 +222,83 @@ internal sealed class OverlayController : IDisposable
         CompositionTarget.Rendering += OnFirstFrame;
     }
 
-    private double VisualTreeHelperDpi() => System.Windows.Media.VisualTreeHelper.GetDpi(_overlay).DpiScaleX;
+    private void ResetDragState()
+    {
+        _dragCts?.Cancel();
+        _dragCts?.Dispose();
+        _dragCts = new CancellationTokenSource();
+        _dragPaths = [];
+        _dragSet = null;
+        _options = [];
+    }
+
+    private async void OnDragEntered(object? sender, DragPayload payload)
+    {
+        _dragPaths = payload.Paths;
+        if (payload.Paths.Count == 0)
+        {
+            _overlay.SetCaption(payload.VirtualFileNames.Count > 0 ? "Attachments can't be converted yet" : "Nothing here can be converted");
+            return;
+        }
+
+        CancellationToken token = _dragCts?.Token ?? CancellationToken.None;
+        if (!payload.Paths.All(File.Exists))
+        {
+            _overlay.SetCaption("Reading folders…");
+        }
+
+        try
+        {
+            DropSet set = await ConversionCoordinator.ExpandAsync(payload.Paths, token);
+            if (token.IsCancellationRequested || !_visible)
+            {
+                return;
+            }
+
+            _dragSet = set;
+            _options = _coordinator.Catalog.TargetOptionsFor(set.Files);
+            Logger.Information("Drag has {Description}; {Count} target(s): {Targets}", Describe(set), _options.Count, _options.Select(o => $"{o.Target.DisplayName} {o.FileCount}/{o.TotalFiles}"));
+
+            if (_options.Count == 0)
+            {
+                _overlay.SetTiles([], set.Files.Count == 0 ? "No files in this drag" : "Nothing here can be converted");
+                return;
+            }
+
+            IEnumerable<OverlayTile> tiles = _options.Take(OverlayModel.MaxTiles)
+                .Select(o => new OverlayTile(o.Target.DisplayName, o.AppliesToAll ? null : $"{o.FileCount} of {o.TotalFiles}"));
+            string summary = Describe(set);
+            if (_options.Count > OverlayModel.MaxTiles)
+            {
+                summary += $" · {_options.Count - OverlayModel.MaxTiles} more formats in the tray window";
+            }
+
+            _overlay.SetTiles(tiles.ToList(), summary);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Logger.Warning(ex, "Reading the dragged files failed");
+            _overlay.SetCaption("Couldn't read the dragged files");
+        }
+    }
+
+    private void OnTileDropped(object? sender, int tile)
+    {
+        if (tile >= 0 && tile < _options.Count)
+        {
+            MediaFormat target = _options[tile].Target;
+            Logger.Information("Dropped on {Target}", target);
+            _ = _coordinator.ConvertAsync(_dragPaths, target, _dragSet);
+            Hide("dropped on a tile");
+        }
+        else
+        {
+            Hide("dropped outside the tiles");
+        }
+    }
 
     private void Hide(string reason)
     {
@@ -207,6 +310,7 @@ internal sealed class OverlayController : IDisposable
 
         _overlay.Hide();
         _visible = false;
+        _dragCts?.Cancel();
         if (!_dragActive)
         {
             _poll.Stop();
@@ -219,27 +323,5 @@ internal sealed class OverlayController : IDisposable
     {
         var (x, y) = OverlayWindowInterop.GetCursorPosition();
         return OverlayWindowInterop.GetWindowRect(_overlay.Handle).Contains(x, y);
-    }
-
-    private void OnDropped(object? sender, DropPayload payload)
-    {
-        if (payload.TileIndex >= 0)
-        {
-            Logger.Information(
-                "DROP on tile {Tile} ({Label}): {PathCount} path(s) {Paths}; {VirtualCount} virtual file(s) {VirtualNames}; formats {Formats}",
-                payload.TileIndex,
-                payload.TileLabel,
-                payload.Paths.Count,
-                payload.Paths,
-                payload.VirtualFileNames.Count,
-                payload.VirtualFileNames,
-                payload.Formats);
-        }
-        else
-        {
-            Logger.Information("Drop outside any tile (dead zone or panel edge); ignored");
-        }
-
-        Hide(payload.TileIndex >= 0 ? "dropped on a tile" : "dropped outside the tiles");
     }
 }

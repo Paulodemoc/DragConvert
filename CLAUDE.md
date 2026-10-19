@@ -28,4 +28,4 @@ C# 14, .NET 10, WPF (Fluent theme), CsWin32. Solution in src/, tests in tests/.
 
 ## Current milestone
 See docs/design.md, Implementation plan. Work on one milestone at a time.
-Status: M2 done (Core engine, image + FFmpeg providers, CLI harness, ADR 0002). Next: M3 tray app and integration (wire overlay to FormatCatalog, tiles per file type, toast, UI pass).
+Status: M3 functional part done (overlay converts via FormatCatalog, toasts, single instance + pipe, Send To, tray window, settings; ADR 0004). Next: user tries docs/test-matrix.md M3 section, then the M3 UI pass (tokens, motion, gallery, snapshots, renderer choice).

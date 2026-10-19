@@ -64,6 +64,19 @@ public sealed class FormatCatalog
             .ToList();
     }
 
+    /// <summary>Splits files into those that can become <paramref name="target"/> and those to skip.</summary>
+    public DropPlan Plan(IEnumerable<string> files, MediaFormat target)
+    {
+        var convert = new List<string>();
+        var skipped = new List<string>();
+        foreach (string file in files)
+        {
+            (FindProvider(file, target) is null ? skipped : convert).Add(file);
+        }
+
+        return new DropPlan(target, convert, skipped);
+    }
+
     public IConversionProvider? FindProvider(string inputPath, MediaFormat target)
     {
         MediaFormat? input = MediaFormats.FromPath(inputPath);

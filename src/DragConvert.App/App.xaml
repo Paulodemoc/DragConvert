@@ -4,16 +4,18 @@
              xmlns:tb="clr-namespace:H.NotifyIcon;assembly=H.NotifyIcon.Wpf"
              ShutdownMode="OnExplicitShutdown">
     <Application.Resources>
-        <!-- Placeholder icon until the real monochrome tray icon lands in M3. -->
+        <!-- Placeholder icon until the real monochrome tray icon lands in the UI pass. -->
         <tb:TaskbarIcon x:Key="TrayIcon" ToolTipText="DragConvert" NoLeftClickDelay="True">
             <tb:TaskbarIcon.IconSource>
                 <tb:GeneratedIconSource Text="D" Foreground="White" Background="#FF2563EB" FontSize="36" />
             </tb:TaskbarIcon.IconSource>
             <tb:TaskbarIcon.ContextMenu>
                 <ContextMenu>
-                    <MenuItem x:Name="RendererItem" Header="Renderer" IsEnabled="False" />
-                    <MenuItem Header="Open log folder" Click="OnOpenLogFolderClick" />
+                    <MenuItem Header="Open DragConvert" FontWeight="SemiBold" Click="OnOpenClick" />
+                    <MenuItem Header="Settings…" Click="OnSettingsClick" />
+                    <MenuItem x:Name="PauseItem" Header="Pause drag overlay" IsCheckable="True" Click="OnPauseClick" />
                     <Separator />
+                    <MenuItem Header="Open log folder" Click="OnOpenLogFolderClick" />
                     <MenuItem Header="Quit" Click="OnQuitClick" />
                 </ContextMenu>
             </tb:TaskbarIcon.ContextMenu>

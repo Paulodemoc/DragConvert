@@ -4,4 +4,4 @@ rem Double-click it from Explorer (or run from a non-admin terminal): an elevate
 rem can't receive drops from Explorer, because Windows blocks drag-and-drop into higher-privilege apps.
 set RENDERER=%1
 if "%RENDERER%"=="" set RENDERER=layered
-start "" "%~dp0..\src\DragConvert.App\bin\Release\net10.0-windows\DragConvert.exe" --console --renderer=%RENDERER%
+start "" "%~dp0..\src\DragConvert.App\bin\Release\net10.0-windows10.0.19041.0\DragConvert.exe" --console --renderer=%RENDERER%

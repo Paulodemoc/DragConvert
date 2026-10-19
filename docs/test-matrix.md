@@ -8,8 +8,8 @@ Hooks, the overlay and drag-and-drop can't be unit tested reliably, so this chec
 
 1. Build: `dotnet build DragConvert.slnx -c Release`
 2. Run with the live log window, once per renderer:
-   - `src\DragConvert.App\bin\Release\net10.0-windows\DragConvert.exe --console --renderer=layered`
-   - `src\DragConvert.App\bin\Release\net10.0-windows\DragConvert.exe --console --renderer=dwm`
+   - `src\DragConvert.App\bin\Release\net10.0-windows10.0.19041.0\DragConvert.exe --console --renderer=layered`
+   - `src\DragConvert.App\bin\Release\net10.0-windows10.0.19041.0\DragConvert.exe --console --renderer=dwm`
 3. The same log is written to `%LOCALAPPDATA%\DragConvert\logs\` (tray icon → Open log folder).
 4. Quit from the tray icon (right-click → Quit) before switching renderer.
 
@@ -66,3 +66,27 @@ The timing is measured from the drag start when Ctrl+Shift is already held, or f
 ### Result
 
 Write the outcome, failures and the renderer decision into `docs/decisions/0001-drag-detection.md`.
+
+## M3: tray app and integration
+
+Start with `tools\run-spike.cmd` (non-elevated). Notifications appear bottom-right.
+
+| # | Check | Expected | Result |
+|---|---|---|---|
+| T1 | Drag a .jpg from Explorer, hold Ctrl+Shift | Ring shows only image targets (PNG, WebP, TIFF, BMP, GIF, PDF), no audio/video | |
+| T2 | Drop it on PNG | `<name>.png` appears beside it; "Converted to PNG" notification with Open and Show in folder; both buttons work | |
+| T3 | Drag 3 photos and 1 video together | Tiles show counts ("JPEG · 3 of 4"), formats valid for all first | |
+| T4 | Drop that mix on an image format | Photos converted, video skipped and named in the notification | |
+| T5 | Drag a folder with subfolders | Caption says "N files in 1 folder"; outputs land beside each original, subfolders included | |
+| T6 | Convert a long video (over 2 s) | Progress notification with a bar and Cancel; Cancel stops it and leaves no partial file | |
+| T7 | Drop the same file twice | Second output is `<name> (1).<ext>`; nothing overwritten | |
+| T8 | Right-click a file → Send to → DragConvert | Tray window opens with that file's formats; clicking one converts it | |
+| T9 | Left-click the tray icon | Tray window with drop zone and recent conversions; Open/Show work | |
+| T10 | Drop files onto the tray window | Formats listed; Tab/Enter work without the mouse | |
+| T11 | Settings: change trigger to Ctrl+Alt | Overlay now needs Ctrl+Alt; Ctrl+Shift does nothing | |
+| T12 | Settings: fixed output folder | Outputs go to that folder | |
+| T13 | Settings: Start with Windows on, sign out and in | DragConvert starts in the tray | |
+| T14 | Tray menu: Pause drag overlay | Overlay no longer appears until unpaused | |
+| T15 | Drag a .docx with the trigger held | Caption "Nothing here can be converted", no tiles | |
+| T16 | Drag an Outlook attachment with the trigger held | Caption "Attachments can't be converted yet" | |
+| T17 | Start a second copy of DragConvert.exe | No second tray icon; the existing tray window opens | |

@@ -29,3 +29,7 @@ DWM_WINDOW_CORNER_PREFERENCE
 AllocConsole
 VIRTUAL_KEY
 WINDOW_EX_STYLE
+SetCurrentProcessExplicitAppUserModelID
+ShellLink
+IShellLinkW
+IPersistFile

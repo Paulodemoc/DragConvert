@@ -3,16 +3,17 @@ using DragConvert.App.Overlay;
 namespace DragConvert.App;
 
 /// <summary>
-/// Command-line flags: --smoke (start, then exit; for CI), --console (live log window),
-/// --renderer=layered|dwm (overlay renderer to compare in the M1 spike).
+/// Command line: file or folder paths (from Send To or a shortcut) plus flags: --smoke (start, then exit; for CI),
+/// --console (live log window), --renderer=layered|dwm (overrides the setting), --send-to (marks Send To launches).
 /// </summary>
-internal sealed record AppOptions(bool Smoke, bool Console, OverlayRenderer Renderer)
+internal sealed record AppOptions(bool Smoke, bool Console, OverlayRenderer? Renderer, IReadOnlyList<string> Paths)
 {
     public static AppOptions Parse(IReadOnlyList<string> args)
     {
         bool smoke = false;
         bool console = false;
-        var renderer = OverlayRenderer.Layered;
+        OverlayRenderer? renderer = null;
+        var paths = new List<string>();
 
         for (int i = 0; i < args.Count; i++)
         {
@@ -35,8 +36,12 @@ internal sealed record AppOptions(bool Smoke, bool Console, OverlayRenderer Rend
                     renderer = parsed;
                 }
             }
+            else if (!arg.StartsWith("--", StringComparison.Ordinal))
+            {
+                paths.Add(arg);
+            }
         }
 
-        return new AppOptions(smoke, console, renderer);
+        return new AppOptions(smoke, console, renderer, paths);
     }
 }

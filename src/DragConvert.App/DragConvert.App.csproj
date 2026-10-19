@@ -2,7 +2,11 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net10.0-windows</TargetFramework>
+    <!-- Windows 10 2004+ API surface for WinRT toast notifications; Windows 10 22H2 and Windows 11 are the targets. -->
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
+    <!-- WPF's Fluent ThemeMode is marked experimental. -->
+    <NoWarn>$(NoWarn);WPF0001</NoWarn>
     <UseWPF>true</UseWPF>
     <AssemblyName>DragConvert</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
