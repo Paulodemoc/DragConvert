@@ -9,6 +9,16 @@ using Serilog;
 
 namespace DragConvert.App.Conversion;
 
+/// <summary>How a drop ended, for the overlay's check mark or cross.</summary>
+internal sealed record BatchOutcome(int Succeeded, int Failed, int Cancelled, bool Notified)
+{
+    public static readonly BatchOutcome Nothing = new(0, 0, 0, Notified: true);
+
+    public static readonly BatchOutcome Declined = new(0, 0, 0, Notified: false);
+
+    public bool AllSucceeded => Succeeded > 0 && Failed == 0 && Cancelled == 0;
+}
+
 internal sealed record RecentConversion(string InputPath, string OutputPath, MediaFormat Target, DateTime Finished)
 {
     public string Description => $"{Path.GetFileName(InputPath)} → {Target.DisplayName}";
@@ -54,7 +64,11 @@ internal sealed class ConversionCoordinator : IDisposable
             ? Task.FromResult(new DropSet(paths, 0, Truncated: false))
             : Task.Run(() => DropExpander.Expand(paths, cancellationToken: cancellationToken), cancellationToken);
 
-    public async Task ConvertAsync(IReadOnlyList<string> droppedPaths, MediaFormat target, DropSet? expanded = null)
+    /// <param name="quietIfFast">
+    /// For overlay drops: a batch that succeeds before the progress delay shows no notification, because the overlay's
+    /// check mark already confirms it. Failures always notify.
+    /// </param>
+    public async Task<BatchOutcome> ConvertAsync(IReadOnlyList<string> droppedPaths, MediaFormat target, DropSet? expanded = null, bool quietIfFast = false)
     {
         try
         {
@@ -72,7 +86,7 @@ internal sealed class ConversionCoordinator : IDisposable
             if (plan.Convert.Count == 0)
             {
                 _notifications.Show(ResultSummary.NothingToConvert(set.Files, target));
-                return;
+                return BatchOutcome.Nothing;
             }
 
             if (plan.Convert.Count > ConfirmThreshold)
@@ -83,22 +97,23 @@ internal sealed class ConversionCoordinator : IDisposable
                 if (!confirmed)
                 {
                     Logger.Information("Large batch declined");
-                    return;
+                    return BatchOutcome.Declined;
                 }
             }
 
-            await RunAsync(plan, set.Truncated);
+            return await RunAsync(plan, set.Truncated, quietIfFast);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             Logger.Error(ex, "Drop failed");
             _notifications.Show(new NotificationText("Couldn't read the dropped files", ex.Message));
+            return BatchOutcome.Nothing;
         }
     }
 
     public void Dispose() => _queue.Dispose();
 
-    private async Task RunAsync(DropPlan plan, bool truncated)
+    private async Task<BatchOutcome> RunAsync(DropPlan plan, bool truncated, bool quietIfFast)
     {
         string tag = Guid.NewGuid().ToString("N")[..12];
         using var cts = new CancellationTokenSource();
@@ -199,8 +214,20 @@ internal sealed class ConversionCoordinator : IDisposable
             actions.Add(new NotificationAction("Open log", "log"));
         }
 
+        var outcome = new BatchOutcome(
+            outputs.Count,
+            results.Count(r => r.Status == ConversionStatus.Failed),
+            results.Count(r => r.Status == ConversionStatus.Cancelled),
+            Notified: true);
+        if (quietIfFast && !progressShown && outcome.AllSucceeded && plan.Skipped.Count == 0 && !truncated)
+        {
+            Logger.Information("Fast batch: confirmed by the overlay's check mark instead of a notification");
+            return outcome with { Notified = false };
+        }
+
         // Same tag replaces the progress notification, if one was shown.
         _notifications.Show(text, actions, progressShown ? tag : null);
+        return outcome;
     }
 
     private void OnNotificationAction(string verb, string argument)

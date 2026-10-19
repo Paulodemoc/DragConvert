@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using DragConvert.App.Conversion;
+using DragConvert.App.Theme;
 using DragConvert.Core.Input;
 using DragConvert.Core.Settings;
 using Microsoft.Win32;
@@ -17,6 +18,7 @@ internal sealed partial class SettingsWindow : Window
     public SettingsWindow()
     {
         InitializeComponent();
+        Icon = AppIcon.Window();
         VersionText.Text = $"DragConvert {Assembly.GetExecutingAssembly().GetName().Version?.ToString(3)}";
     }
 

@@ -15,6 +15,8 @@ C# 14, .NET 10, WPF (Fluent theme), CsWin32. Solution in src/, tests in tests/.
 - Record non-obvious decisions as short ADRs in docs/decisions/.
 - Licensing: no GPL/AGPL components. FFmpeg must be an LGPL build (MP4 uses h264_mf, not x264). HEIC is input-only.
 - Apps launched from an elevated shell are elevated, and Windows then blocks drops from Explorer: launch GUI test builds via tools/run-spike.cmd from Explorer.
+- Visual values (sizes, radii, colours, timings) belong in src/DragConvert.App/Theme/Tokens.xaml, not in code.
+- After UI changes, render snapshots and look at them before saying the UI is done; also run the --smoke check.
 - Hooks and overlay can't be unit tested: keep docs/test-matrix.md as the manual checklist the user runs on a real desktop.
 
 ## Commands
@@ -22,10 +24,12 @@ C# 14, .NET 10, WPF (Fluent theme), CsWin32. Solution in src/, tests in tests/.
 - Test: dotnet test DragConvert.slnx
 - Smoke run (starts and exits): DragConvert.exe --smoke
 - Fetch FFmpeg for dev/tests (LGPL build into tools/bin, git-ignored): pwsh tools/fetch-ffmpeg.ps1
+- UI gallery (every overlay state, live): DragConvert.exe --gallery
+- UI snapshots to PNG (review visuals; also regenerates Assets/DragConvert.ico source): DragConvert.exe --snapshot[=dir] (default artifacts/ui)
 - CLI harness: dotnet run --project src/DragConvert.Cli -- formats <file> | convert <file>... <format> [--out <dir>]
 - Run app: dotnet run --project src/DragConvert.App -- --console [--renderer=layered|dwm]
 - Logs: %LOCALAPPDATA%\DragConvert\logs
 
 ## Current milestone
 See docs/design.md, Implementation plan. Work on one milestone at a time.
-Status: M3 functional part done (overlay converts via FormatCatalog, toasts, single instance + pipe, Send To, tray window, settings; ADR 0004). Next: user tries docs/test-matrix.md M3 section, then the M3 UI pass (tokens, motion, gallery, snapshots, renderer choice).
+Status: M3 done pending the owner's review of the UI pass (ADR 0005). Next: M4 PDF and tools (Alt tiles).

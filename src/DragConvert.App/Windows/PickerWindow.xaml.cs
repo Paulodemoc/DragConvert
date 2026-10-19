@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using DragConvert.App.Conversion;
+using DragConvert.App.Theme;
 using DragConvert.Core.Conversion;
 using Serilog;
 
@@ -11,6 +12,8 @@ namespace DragConvert.App.Windows;
 
 internal sealed record TargetChoice(MediaFormat Target, string Label, string? Detail)
 {
+    public string Glyph => OverlayTheme.Glyph(Target.Category);
+
     public string AccessibleName => Detail is null ? $"Convert to {Label}" : $"Convert to {Label}, {Detail} files";
 }
 
@@ -31,6 +34,7 @@ internal sealed partial class PickerWindow : Window
     {
         _coordinator = coordinator;
         InitializeComponent();
+        Icon = AppIcon.Window();
         RecentList.ItemsSource = coordinator.Recent;
         coordinator.Recent.CollectionChanged += (_, _) => UpdateRecentVisibility();
         UpdateRecentVisibility();

@@ -56,6 +56,38 @@ public class OverlayModelTests
     }
 
     [Theory]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    [InlineData(5)]
+    [InlineData(6)]
+    [InlineData(7)]
+    [InlineData(8)]
+    public void Square_tiles_never_overlap_and_keep_the_gap(int count)
+    {
+        const double tile = 60;
+        const double gap = 8;
+        var model = new OverlayModel(count, tileSize: tile, deadZoneRadius: 44, gap: gap);
+        for (int i = 0; i < count; i++)
+        {
+            for (int j = i + 1; j < count; j++)
+            {
+                var (ax, ay) = model.TileCenter(i);
+                var (bx, by) = model.TileCenter(j);
+                double separation = Math.Max(Math.Abs(ax - bx), Math.Abs(ay - by));
+                Assert.True(separation >= tile + gap - 1e-9, $"Tiles {i} and {j} of {count} are {separation:F1} apart");
+            }
+        }
+    }
+
+    [Fact]
+    public void Tiles_clear_the_dead_zone()
+    {
+        var model = new OverlayModel(3, tileSize: 60, deadZoneRadius: 44, gap: 8);
+        Assert.True(model.RingRadius - 30 >= 44 + 8 - 1e-9);
+    }
+
+    [Theory]
     [InlineData(0)]
     [InlineData(9)]
     public void Tile_count_must_be_between_one_and_eight(int count) =>

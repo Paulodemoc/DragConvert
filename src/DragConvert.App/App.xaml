@@ -4,11 +4,13 @@
              xmlns:tb="clr-namespace:H.NotifyIcon;assembly=H.NotifyIcon.Wpf"
              ShutdownMode="OnExplicitShutdown">
     <Application.Resources>
-        <!-- Placeholder icon until the real monochrome tray icon lands in the UI pass. -->
+        <ResourceDictionary>
+        <ResourceDictionary.MergedDictionaries>
+            <ResourceDictionary Source="Theme/Tokens.xaml" />
+        </ResourceDictionary.MergedDictionaries>
+
+        <!-- The icon is set in code so it can follow the taskbar's light/dark theme. -->
         <tb:TaskbarIcon x:Key="TrayIcon" ToolTipText="DragConvert" NoLeftClickDelay="True">
-            <tb:TaskbarIcon.IconSource>
-                <tb:GeneratedIconSource Text="D" Foreground="White" Background="#FF2563EB" FontSize="36" />
-            </tb:TaskbarIcon.IconSource>
             <tb:TaskbarIcon.ContextMenu>
                 <ContextMenu>
                     <MenuItem Header="Open DragConvert" FontWeight="SemiBold" Click="OnOpenClick" />
@@ -20,5 +22,6 @@
                 </ContextMenu>
             </tb:TaskbarIcon.ContextMenu>
         </tb:TaskbarIcon>
+        </ResourceDictionary>
     </Application.Resources>
 </Application>

@@ -3,6 +3,7 @@ using System.IO;
 using System.Windows.Media;
 using System.Windows.Threading;
 using DragConvert.App.Conversion;
+using DragConvert.App.Theme;
 using DragConvert.Core.Conversion;
 using DragConvert.Core.Input;
 using DragConvert.Core.Overlay;
@@ -24,6 +25,9 @@ internal sealed class OverlayController : IDisposable
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(10);
     private static readonly TimeSpan DropWait = TimeSpan.FromMilliseconds(500);
 
+    // Matches the coordinator's progress delay: slower batches hand over to the progress notification.
+    private static readonly TimeSpan BubbleLimit = TimeSpan.FromSeconds(1.5);
+
     private readonly Dispatcher _dispatcher;
     private readonly ConversionCoordinator _coordinator;
     private readonly OverlayWindow _overlay;
@@ -34,6 +38,7 @@ internal sealed class OverlayController : IDisposable
     private bool _escaped;
     private bool _visible;
     private int _showCount;
+    private int _bubble;
 
     // State for the drag currently over the overlay.
     private CancellationTokenSource? _dragCts;
@@ -200,6 +205,7 @@ internal sealed class OverlayController : IDisposable
     {
         var (x, y) = OverlayWindowInterop.GetCursorPosition();
         ResetDragState();
+        _bubble++;
         _overlay.ShowAt(x, y);
         _visible = true;
         int showNumber = ++_showCount;
@@ -237,14 +243,14 @@ internal sealed class OverlayController : IDisposable
         _dragPaths = payload.Paths;
         if (payload.Paths.Count == 0)
         {
-            _overlay.SetCaption(payload.VirtualFileNames.Count > 0 ? "Attachments can't be converted yet" : "Nothing here can be converted");
+            _overlay.View.SetCaption(payload.VirtualFileNames.Count > 0 ? "Attachments can't be converted yet" : "Nothing here can be converted");
             return;
         }
 
         CancellationToken token = _dragCts?.Token ?? CancellationToken.None;
         if (!payload.Paths.All(File.Exists))
         {
-            _overlay.SetCaption("Reading folders…");
+            _overlay.View.SetCaption("Reading folders…");
         }
 
         try
@@ -259,21 +265,23 @@ internal sealed class OverlayController : IDisposable
             _options = _coordinator.Catalog.TargetOptionsFor(set.Files);
             Logger.Information("Drag has {Description}; {Count} target(s): {Targets}", Describe(set), _options.Count, _options.Select(o => $"{o.Target.DisplayName} {o.FileCount}/{o.TotalFiles}"));
 
+            MediaCategory[] categories = set.Files.Select(f => MediaFormats.FromPath(f)?.Category).OfType<MediaCategory>().Distinct().ToArray();
+            _overlay.View.SetBadge(categories.Length == 1 ? categories[0] : null, set.Files.Count);
             if (_options.Count == 0)
             {
-                _overlay.SetTiles([], set.Files.Count == 0 ? "No files in this drag" : "Nothing here can be converted");
+                _overlay.View.SetTiles([], set.Files.Count == 0 ? "No files in this drag" : "Nothing here can be converted");
                 return;
             }
 
             IEnumerable<OverlayTile> tiles = _options.Take(OverlayModel.MaxTiles)
-                .Select(o => new OverlayTile(o.Target.DisplayName, o.AppliesToAll ? null : $"{o.FileCount} of {o.TotalFiles}"));
+                .Select(o => new OverlayTile(o.Target.DisplayName, o.AppliesToAll ? null : $"{o.FileCount} of {o.TotalFiles}", o.Target.Category));
             string summary = Describe(set);
             if (_options.Count > OverlayModel.MaxTiles)
             {
                 summary += $" · {_options.Count - OverlayModel.MaxTiles} more formats in the tray window";
             }
 
-            _overlay.SetTiles(tiles.ToList(), summary);
+            _overlay.View.SetTiles(tiles.ToList(), summary);
         }
         catch (OperationCanceledException)
         {
@@ -281,22 +289,62 @@ internal sealed class OverlayController : IDisposable
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             Logger.Warning(ex, "Reading the dragged files failed");
-            _overlay.SetCaption("Couldn't read the dragged files");
+            _overlay.View.SetCaption("Couldn't read the dragged files");
         }
     }
 
-    private void OnTileDropped(object? sender, int tile)
+    private async void OnTileDropped(object? sender, int tile)
     {
-        if (tile >= 0 && tile < _options.Count)
-        {
-            MediaFormat target = _options[tile].Target;
-            Logger.Information("Dropped on {Target}", target);
-            _ = _coordinator.ConvertAsync(_dragPaths, target, _dragSet);
-            Hide("dropped on a tile");
-        }
-        else
+        if (tile < 0 || tile >= _options.Count)
         {
             Hide("dropped outside the tiles");
+            return;
+        }
+
+        MediaFormat target = _options[tile].Target;
+        Logger.Information("Dropped on {Target}", target);
+        Task<BatchOutcome> batch = _coordinator.ConvertAsync(_dragPaths, target, _dragSet, quietIfFast: true);
+
+        // The overlay turns into a status bubble at the dropped tile: spinner, then a check mark or a cross.
+        _dropWait.Stop();
+        _visible = false;
+        _dragCts?.Cancel();
+        if (!_dragActive)
+        {
+            _poll.Stop();
+        }
+
+        int bubble = ++_bubble;
+        _overlay.ShowWorking(tile);
+
+        if (await Task.WhenAny(batch, Task.Delay(BubbleLimit)) != batch)
+        {
+            // Slow batch: the progress notification takes over.
+            if (bubble == _bubble)
+            {
+                _overlay.FadeOut();
+            }
+
+            return;
+        }
+
+        BatchOutcome outcome = await batch;
+        if (bubble != _bubble)
+        {
+            return;
+        }
+
+        if (outcome == BatchOutcome.Declined)
+        {
+            _overlay.FadeOut();
+            return;
+        }
+
+        _overlay.View.ShowResult(outcome.AllSucceeded);
+        await Task.Delay(OverlayTheme.Duration("Motion.ResultHoldMs"));
+        if (bubble == _bubble)
+        {
+            _overlay.FadeOut();
         }
     }
 
@@ -308,7 +356,7 @@ internal sealed class OverlayController : IDisposable
             return;
         }
 
-        _overlay.Hide();
+        _overlay.FadeOut();
         _visible = false;
         _dragCts?.Cancel();
         if (!_dragActive)

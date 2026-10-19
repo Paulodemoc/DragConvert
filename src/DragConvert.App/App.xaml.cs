@@ -5,9 +5,11 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
 using DragConvert.App.Conversion;
+using DragConvert.App.Gallery;
 using DragConvert.App.Instance;
 using DragConvert.App.Notifications;
 using DragConvert.App.Overlay;
+using DragConvert.App.Theme;
 using DragConvert.App.Windows;
 using DragConvert.Core.Conversion;
 using DragConvert.Core.Input;
@@ -39,6 +41,26 @@ public partial class App : Application
         long startTimestamp = Stopwatch.GetTimestamp();
         base.OnStartup(e);
         AppOptions options = AppOptions.Parse(e.Args);
+
+        // Developer tools: render the UI with fake data instead of starting the tray app.
+        if (options.SnapshotDirectory is { } snapshotDirectory)
+        {
+            foreach (string file in UiGallery.Snapshot(snapshotDirectory))
+            {
+                Console.WriteLine(file);
+            }
+
+            Shutdown(0);
+            return;
+        }
+
+        if (options.Gallery)
+        {
+            Window gallery = UiGallery.CreateWindow();
+            gallery.Closed += (_, _) => Shutdown(0);
+            gallery.Show();
+            return;
+        }
 
         // Later launches (Send To, shortcuts) hand their files to the running tray process and exit.
         _instance = SingleInstance.TryAcquire();
@@ -76,6 +98,8 @@ public partial class App : Application
         _picker = new PickerWindow(_coordinator);
 
         _trayIcon = (TaskbarIcon)FindResource("TrayIcon");
+        _trayIcon.Icon = AppIcon.Tray(OverlayTheme.IsTaskbarLight());
+        Microsoft.Win32.SystemEvents.UserPreferenceChanged += (_, _) => Dispatcher.InvokeAsync(() => _trayIcon.Icon = AppIcon.Tray(OverlayTheme.IsTaskbarLight()));
         // Efficiency mode lowers process priority, which would hurt the overlay's show latency.
         _trayIcon.ForceCreate(enablesEfficiencyMode: false);
         _trayIcon.TrayLeftMouseUp += (_, _) => _picker.ShowEmpty();

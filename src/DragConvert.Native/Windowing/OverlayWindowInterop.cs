@@ -29,6 +29,15 @@ public static class OverlayWindowInterop
         PInvoke.SetWindowLong(handle, WINDOW_LONG_PTR_INDEX.GWL_EXSTYLE, exStyle);
     }
 
+    /// <summary>Click-through on or off (WS_EX_TRANSPARENT): used while the overlay only shows a status bubble.</summary>
+    public static void SetClickThrough(nint hwnd, bool clickThrough)
+    {
+        var handle = new HWND(hwnd);
+        int exStyle = PInvoke.GetWindowLong(handle, WINDOW_LONG_PTR_INDEX.GWL_EXSTYLE);
+        exStyle = clickThrough ? exStyle | (int)WINDOW_EX_STYLE.WS_EX_TRANSPARENT : exStyle & ~(int)WINDOW_EX_STYLE.WS_EX_TRANSPARENT;
+        PInvoke.SetWindowLong(handle, WINDOW_LONG_PTR_INDEX.GWL_EXSTYLE, exStyle);
+    }
+
     public static (int X, int Y) GetCursorPosition()
     {
         PInvoke.GetCursorPos(out var point);
