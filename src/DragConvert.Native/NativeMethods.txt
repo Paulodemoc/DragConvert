@@ -37,3 +37,12 @@ SelectObject
 BitBlt
 DeleteObject
 GetDIBits
+CreateJobObject
+SetInformationJobObject
+AssignProcessToJobObject
+JOBOBJECT_EXTENDED_LIMIT_INFORMATION
+SHQueryUserNotificationState
+GetLastInputInfo
+GetDpiForMonitor
+EmptyWorkingSet
+GetCurrentProcess

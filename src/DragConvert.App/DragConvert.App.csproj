@@ -10,6 +10,9 @@
     <UseWPF>true</UseWPF>
     <AssemblyName>DragConvert</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- Mostly idle tray app: no background GC thread, smaller heap reservations. -->
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+    <TieredPGO>true</TieredPGO>
     <!-- Generated from assets/icon-source/app.png (see Theme/AppIcon.cs). -->
     <ApplicationIcon>Assets\DragConvert.ico</ApplicationIcon>
   </PropertyGroup>

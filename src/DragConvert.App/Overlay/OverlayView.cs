@@ -28,6 +28,24 @@ internal abstract class OverlayView : Canvas
     protected static bool Animate => AnimationsOverride ?? SystemParameters.ClientAreaAnimation;
 
     /// <summary>
+    /// Starts or stops a spinner's rotation. Only runs while a conversion is shown: a forever animation keeps WPF
+    /// rendering frames even on a hidden window, which costs CPU while the app sits idle.
+    /// </summary>
+    protected static void Spin(System.Windows.Media.RotateTransform transform, bool on)
+    {
+        if (on && Animate)
+        {
+            transform.BeginAnimation(
+                System.Windows.Media.RotateTransform.AngleProperty,
+                new System.Windows.Media.Animation.DoubleAnimation(0, 360, TimeSpan.FromSeconds(0.9)) { RepeatBehavior = System.Windows.Media.Animation.RepeatBehavior.Forever });
+        }
+        else
+        {
+            transform.BeginAnimation(System.Windows.Media.RotateTransform.AngleProperty, null);
+        }
+    }
+
+    /// <summary>
     /// The screen area behind the overlay, captured just before it appears and already blurred, exactly the size of the
     /// view, with its average brightness (0 to 1); null when the capture failed. Only called when <see cref="WantsBackdrop"/>.
     /// </summary>

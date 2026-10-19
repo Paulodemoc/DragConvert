@@ -30,6 +30,7 @@ internal sealed class RingOverlayView : OverlayView
     private readonly Border _caption;
     private readonly TextBlock _captionText;
     private readonly Grid _bubble;
+    private RotateTransform _spin = new();
     private readonly ScaleTransform _bubbleScale = new(1, 1);
     private readonly List<Border> _tileViews = [];
     private OverlayModel? _model;
@@ -135,6 +136,7 @@ internal sealed class RingOverlayView : OverlayView
         _badge.Visibility = Visibility.Collapsed;
         SetCaption(null);
         _bubble.Visibility = Visibility.Collapsed;
+        Spin(_spin, on: false);
         _ring.BeginAnimation(OpacityProperty, null);
         _ringScale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
         _ringScale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
@@ -280,6 +282,7 @@ internal sealed class RingOverlayView : OverlayView
         }
 
         _bubble.Visibility = Visibility.Visible;
+        Spin(_spin, on: true);
         if (Animate)
         {
             var collapse = OverlayTheme.Duration("Motion.CollapseMs");
@@ -298,6 +301,7 @@ internal sealed class RingOverlayView : OverlayView
     /// <summary>Replaces the spinner with a check mark (success) or a cross (failure).</summary>
     public override void ShowResult(bool success)
     {
+        Spin(_spin, on: false);
         foreach (UIElement child in _bubble.Children)
         {
             if (child is TextBlock glyph)
@@ -441,7 +445,8 @@ internal sealed class RingOverlayView : OverlayView
 
         // Spinner: a 270° arc that rotates while the conversion runs.
         double r = (size / 2) - 10;
-        var rotate = new RotateTransform(0, size / 2, size / 2);
+        _spin = new RotateTransform(0, size / 2, size / 2);
+        var rotate = _spin;
         var arc = new Path
         {
             Stroke = _theme.Accent,
@@ -451,11 +456,6 @@ internal sealed class RingOverlayView : OverlayView
             Data = new PathGeometry([new PathFigure(new Point(size / 2, 10), [new ArcSegment(new Point((size / 2) - r, size / 2), new Size(r, r), 0, true, SweepDirection.Clockwise, true)], false)]),
             RenderTransform = rotate,
         };
-        if (Animate)
-        {
-            rotate.BeginAnimation(RotateTransform.AngleProperty, new DoubleAnimation(0, 360, TimeSpan.FromSeconds(0.9)) { RepeatBehavior = RepeatBehavior.Forever });
-        }
-
         grid.Children.Add(arc);
         grid.Children.Add(new TextBlock
         {

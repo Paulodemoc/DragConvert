@@ -9,9 +9,11 @@ namespace DragConvert.Core.Tools;
 public sealed class ToolRunner : IDisposable
 {
     private readonly SemaphoreSlim _gate;
+    private readonly ITempTracker? _temps;
 
-    public ToolRunner(int? maxParallelism = null)
+    public ToolRunner(int? maxParallelism = null, ITempTracker? temps = null)
     {
+        _temps = temps;
         int parallelism = Math.Max(1, maxParallelism ?? (Environment.ProcessorCount / 2));
         _gate = new SemaphoreSlim(parallelism, parallelism);
     }
@@ -92,6 +94,7 @@ public sealed class ToolRunner : IDisposable
             string extension = folder ? string.Empty : tool.OutputExtension(format);
             string finalPath = OutputPaths.PlanFinal(first, tool.NameSuffix, extension, outputDirectory);
             tempPath = OutputPaths.TempFor(finalPath);
+            _temps?.Created(tempPath);
             if (folder)
             {
                 Directory.CreateDirectory(tempPath);
@@ -108,6 +111,7 @@ public sealed class ToolRunner : IDisposable
             }
 
             finalPath = MoveIntoPlace(tempPath, first, tool.NameSuffix, extension, outputDirectory, finalPath, folder);
+            _temps?.Finished(tempPath);
             tempPath = null;
             progress?.Report(1);
             return ToolResult.Success(tool, inputs, finalPath);
@@ -134,6 +138,7 @@ public sealed class ToolRunner : IDisposable
             if (tempPath is not null)
             {
                 TryDelete(tempPath);
+                _temps?.Finished(tempPath);
             }
 
             _gate.Release();

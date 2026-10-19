@@ -40,17 +40,18 @@ internal sealed class ConversionCoordinator : IDisposable
     private static readonly TimeSpan ProgressInterval = TimeSpan.FromMilliseconds(500);
 
     private readonly JobQueue _queue;
-    private readonly ToolRunner _tools = new();
+    private readonly ToolRunner _tools;
     private readonly NotificationService _notifications;
     private readonly Func<AppSettings> _settings;
     private readonly Dispatcher _dispatcher;
     private readonly Dictionary<string, CancellationTokenSource> _running = [];
 
-    public ConversionCoordinator(FormatCatalog catalog, ToolCatalog tools, NotificationService notifications, Func<AppSettings> settings, Dispatcher dispatcher)
+    public ConversionCoordinator(FormatCatalog catalog, ToolCatalog tools, NotificationService notifications, Func<AppSettings> settings, Dispatcher dispatcher, ITempTracker? temps = null)
     {
         Catalog = catalog;
         Tools = tools;
-        _queue = new JobQueue(catalog);
+        _queue = new JobQueue(catalog, temps: temps);
+        _tools = new ToolRunner(temps: temps);
         _notifications = notifications;
         _settings = settings;
         _dispatcher = dispatcher;
@@ -60,6 +61,18 @@ internal sealed class ConversionCoordinator : IDisposable
     public FormatCatalog Catalog { get; }
 
     public ToolCatalog Tools { get; }
+
+    /// <summary>True while any conversion or tool run is in progress.</summary>
+    public bool IsBusy
+    {
+        get
+        {
+            lock (_running)
+            {
+                return _running.Count > 0;
+            }
+        }
+    }
 
     /// <summary>Most recent successful conversions first (UI thread only).</summary>
     public ObservableCollection<RecentConversion> Recent { get; } = [];

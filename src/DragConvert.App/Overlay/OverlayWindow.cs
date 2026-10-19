@@ -111,10 +111,13 @@ internal sealed class OverlayWindow : Window
         _payload = null;
         _anchor = (x, y);
 
+        // Moving to a monitor with different scaling resizes the window (WM_DPICHANGED), so centre twice: once to get
+        // there, once with the size it has there.
+        OverlayWindowInterop.CenterOnPoint(Handle, x, y);
         ScreenRect placed = OverlayWindowInterop.CenterOnPoint(Handle, x, y);
         if (!IsVisible)
         {
-            CaptureBackdrop(placed);
+            CaptureBackdrop(placed, Native.Platform.SessionState.DpiScaleAt(x, y));
             Show();
         }
 
@@ -262,14 +265,14 @@ internal sealed class OverlayWindow : Window
     /// For styles that blur what's behind them (glass): copy that screen area before the window appears, with a margin
     /// so the blur has real pixels at the disc's edge, and hand it to the view.
     /// </summary>
-    private void CaptureBackdrop(ScreenRect placed)
+    private void CaptureBackdrop(ScreenRect placed, double? monitorScale = null)
     {
         if (!View.WantsBackdrop)
         {
             return;
         }
 
-        double scale = VisualTreeHelper.GetDpi(this).DpiScaleX;
+        double scale = monitorScale ?? VisualTreeHelper.GetDpi(this).DpiScaleX;
         int margin = (int)Math.Ceiling(GlassOverlayView.BackdropMargin * scale);
         var area = new ScreenRect(placed.Left - margin, placed.Top - margin, placed.Right + margin, placed.Bottom + margin);
         long start = System.Diagnostics.Stopwatch.GetTimestamp();

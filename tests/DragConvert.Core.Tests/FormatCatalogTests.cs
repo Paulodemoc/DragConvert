@@ -59,6 +59,30 @@ public class FormatCatalogTests
     }
 
     [Fact]
+    public void Refresh_picks_up_capabilities_a_provider_lost_at_runtime()
+    {
+        var video = new MutableProvider(new ConversionCapability(Mov, Mp4), new ConversionCapability(Mov, WebM));
+        var catalog = new FormatCatalog([video]);
+        Assert.Equal([Mp4, WebM], catalog.TargetsFor("clip.mov"));
+
+        video.Capabilities = [new ConversionCapability(Mov, WebM)];
+        catalog.Refresh();
+
+        Assert.Equal([WebM], catalog.TargetsFor("clip.mov"));
+    }
+
+    private sealed class MutableProvider(params ConversionCapability[] capabilities) : IConversionProvider
+    {
+        public string Id => "mutable";
+
+        public bool IsAvailable => true;
+
+        public IReadOnlyCollection<ConversionCapability> Capabilities { get; set; } = capabilities;
+
+        public Task ConvertAsync(ConversionJob job, IProgress<double>? progress, CancellationToken cancellationToken) => Task.CompletedTask;
+    }
+
+    [Fact]
     public void Unavailable_providers_are_ignored()
     {
         var missingEngine = new FakeProvider("ffmpeg", new ConversionCapability(Wav, Mp3)) { IsAvailable = false };

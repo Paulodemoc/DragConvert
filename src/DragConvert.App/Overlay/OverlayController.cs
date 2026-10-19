@@ -10,6 +10,7 @@ using DragConvert.Core.Overlay;
 using DragConvert.Core.Tools;
 using DragConvert.Native;
 using DragConvert.Native.Input;
+using DragConvert.Native.Platform;
 using DragConvert.Native.Windowing;
 using Serilog;
 
@@ -32,7 +33,16 @@ internal sealed class OverlayController : IDisposable
     private readonly Dispatcher _dispatcher;
     private readonly ConversionCoordinator _coordinator;
     private OverlayWindow _overlay;
-    private readonly MouseHookThread _hook;
+    private static readonly TimeSpan SupervisorInterval = TimeSpan.FromSeconds(3);
+    private static readonly TimeSpan ReinstallCooldown = TimeSpan.FromSeconds(30);
+
+    private readonly DispatcherTimer _supervisor;
+    private MouseHookThread? _hook;
+    private string? _hookOffReason = "not started";
+    private (int X, int Y) _lastCursor;
+    private long _lastSupervisorTick;
+    private long _lastReinstallTick = -ReinstallCooldown.Ticks;
+    private bool _paused;
     private readonly DispatcherTimer _poll;
     private readonly DispatcherTimer _dropWait;
     private bool _dragActive;
@@ -56,7 +66,8 @@ internal sealed class OverlayController : IDisposable
         Renderer = renderer;
         Chord = chord;
         _overlay = CreateOverlay(renderer);
-        _hook = new MouseHookThread(OnHookSignal);
+        _supervisor = new DispatcherTimer(SupervisorInterval, DispatcherPriority.Background, (_, _) => Supervise(), dispatcher);
+        _supervisor.Stop();
         _poll = new DispatcherTimer(PollInterval, DispatcherPriority.Input, (_, _) => Evaluate(Stopwatch.GetTimestamp(), fromHook: false), dispatcher);
         _poll.Stop();
         _dropWait = new DispatcherTimer(DropWait, DispatcherPriority.Normal, (_, _) => Hide("no drop within 500 ms of release"), dispatcher);
@@ -68,27 +79,34 @@ internal sealed class OverlayController : IDisposable
     /// <summary>The trigger chord; <see cref="Modifiers.None"/> means the overlay never shows.</summary>
     public ModifierChord Chord { get; set; }
 
-    /// <summary>When paused, drags are ignored (the hook stays installed but does nothing).</summary>
-    public bool Paused { get; set; }
+    /// <summary>When paused, the mouse hook is removed entirely until resumed.</summary>
+    public bool Paused
+    {
+        get => _paused;
+        set
+        {
+            _paused = value;
+            Supervise();
+        }
+    }
+
+    /// <summary>True when the overlay is on screen or a drag is being tracked.</summary>
+    public bool IsActive => _visible || _dragActive;
 
     public void Start()
     {
         PrepareOverlay();
-        _hook.Start();
-        if (_hook.IsInstalled)
-        {
-            Logger.Information("Mouse hook installed; drag threshold {X}x{Y} px; trigger {Trigger}", DragMetrics.ThresholdX, DragMetrics.ThresholdY, Chord.Trigger);
-        }
-        else
-        {
-            Logger.Error("Mouse hook failed to install (Win32 error {Error})", _hook.InstallError);
-        }
+        Supervise();
+        _supervisor.Start();
     }
 
+    /// <summary>Rebuilds the overlay window, e.g. after Windows switched between light, dark and high contrast.</summary>
+    public void Rebuild(OverlayRenderer renderer) => SwitchRenderer(renderer, force: true);
+
     /// <summary>Switches the overlay style immediately: the window is rebuilt and warmed up again.</summary>
-    public void SwitchRenderer(OverlayRenderer renderer)
+    public void SwitchRenderer(OverlayRenderer renderer, bool force = false)
     {
-        if (renderer == Renderer)
+        if (renderer == Renderer && !force)
         {
             return;
         }
@@ -106,13 +124,87 @@ internal sealed class OverlayController : IDisposable
         PrepareOverlay();
     }
 
+    /// <summary>
+    /// Every few seconds: keeps the mouse hook out of the way while paused, in a fullscreen app or in a remote session,
+    /// and reinstalls it if Windows silently dropped it (the cursor moved but the hook saw nothing).
+    /// </summary>
+    private void Supervise()
+    {
+        string? offReason = _paused ? "paused"
+            : SessionState.IsRemoteSession ? "remote desktop session"
+            : SessionState.IsFullscreenAppActive && !_visible ? "fullscreen app in front"
+            : null;
+        if (offReason is not null)
+        {
+            if (_hook is not null || _hookOffReason != offReason)
+            {
+                RemoveHook(offReason);
+            }
+
+            return;
+        }
+
+        if (_hook is null)
+        {
+            InstallHook();
+            return;
+        }
+
+        var cursor = OverlayWindowInterop.GetCursorPosition();
+        long now = Environment.TickCount64;
+        bool cursorMoved = cursor != _lastCursor && _lastSupervisorTick > 0;
+        if (cursorMoved && _hook.LastEventTick < _lastSupervisorTick && now - _lastReinstallTick > ReinstallCooldown.TotalMilliseconds)
+        {
+            Logger.Warning("Mouse hook saw no events while the cursor moved; Windows probably removed it. Reinstalling");
+            _lastReinstallTick = now;
+            RemoveHook("watchdog");
+            InstallHook();
+        }
+
+        _lastCursor = cursor;
+        _lastSupervisorTick = now;
+    }
+
+    private void InstallHook()
+    {
+        var hook = new MouseHookThread(OnHookSignal);
+        hook.Start();
+        if (!hook.IsInstalled)
+        {
+            Logger.Error("Mouse hook failed to install (Win32 error {Error})", hook.InstallError);
+            hook.Dispose();
+            return;
+        }
+
+        _hook = hook;
+        _hookOffReason = null;
+        _lastSupervisorTick = 0;
+        Logger.Information("Mouse hook installed; drag threshold {X}x{Y} px; trigger {Trigger}", DragMetrics.ThresholdX, DragMetrics.ThresholdY, Chord.Trigger);
+    }
+
+    private void RemoveHook(string reason)
+    {
+        if (_hook is not null)
+        {
+            _hook.Dispose();
+            _hook = null;
+            Logger.Information("Mouse hook removed: {Reason}", reason);
+        }
+
+        _hookOffReason = reason;
+        _dragActive = false;
+        Hide(reason);
+        _poll.Stop();
+    }
+
     public void Dispose()
     {
         _poll.Stop();
         _dropWait.Stop();
+        _supervisor.Stop();
         _dragCts?.Cancel();
         _dragCts?.Dispose();
-        _hook.Dispose();
+        _hook?.Dispose();
         _overlay.Close();
     }
 

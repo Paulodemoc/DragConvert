@@ -41,6 +41,7 @@ internal sealed class GlassOverlayView : OverlayView
     private readonly TextBlock _countText;
     private readonly TextBlock _caption;
     private readonly Path _spinner;
+    private readonly RotateTransform _spin;
     private readonly TextBlock _resultGlyph;
     private readonly List<(Grid Root, Ellipse Bubble, TextBlock Glyph)> _tileViews = [];
     private OverlayModel? _model;
@@ -180,7 +181,7 @@ internal sealed class GlassOverlayView : OverlayView
         centerStack.Children.Add(_caption);
 
         double spinnerRadius = 20;
-        var spin = new RotateTransform(0, spinnerRadius, spinnerRadius);
+        _spin = new RotateTransform(0, spinnerRadius, spinnerRadius);
         _spinner = new Path
         {
             Width = 2 * spinnerRadius,
@@ -190,16 +191,11 @@ internal sealed class GlassOverlayView : OverlayView
             StrokeStartLineCap = PenLineCap.Round,
             StrokeEndLineCap = PenLineCap.Round,
             Data = new PathGeometry([new PathFigure(new Point(spinnerRadius, 2), [new ArcSegment(new Point(2, spinnerRadius), new Size(spinnerRadius - 2, spinnerRadius - 2), 0, true, SweepDirection.Clockwise, true)], false)]),
-            RenderTransform = spin,
+            RenderTransform = _spin,
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
             Visibility = Visibility.Collapsed,
         };
-        if (Animate)
-        {
-            spin.BeginAnimation(RotateTransform.AngleProperty, new DoubleAnimation(0, 360, TimeSpan.FromSeconds(0.9)) { RepeatBehavior = RepeatBehavior.Forever });
-        }
-
         _resultGlyph = new TextBlock
         {
             FontFamily = OverlayTheme.IconFont,
@@ -242,6 +238,7 @@ internal sealed class GlassOverlayView : OverlayView
     {
         SetTiles([], animate: false);
         SetCaption(null);
+        Spin(_spin, on: false);
         _countBadge.Visibility = Visibility.Collapsed;
         _centerGlyph.Text = OverlayTheme.Glyphs.Files;
         ShowCenter(content: true);
@@ -381,10 +378,12 @@ internal sealed class GlassOverlayView : OverlayView
 
         ShowCenter(content: false);
         _spinner.Visibility = Visibility.Visible;
+        Spin(_spin, on: true);
     }
 
     public override void ShowResult(bool success)
     {
+        Spin(_spin, on: false);
         _spinner.Visibility = Visibility.Collapsed;
         _resultGlyph.Text = success ? OverlayTheme.Glyphs.Check : OverlayTheme.Glyphs.Failure;
         _resultGlyph.Foreground = success ? Brushes.White : new SolidColorBrush(Color.FromRgb(0xFF, 0xB4, 0xBC));

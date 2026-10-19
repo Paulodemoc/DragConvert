@@ -21,6 +21,7 @@ public sealed class MouseHookThread : IDisposable
     private readonly ManualResetEventSlim _ready = new();
     private Thread? _thread;
     private uint _threadId;
+    private long _lastEventTick = Environment.TickCount64;
 
     public MouseHookThread(Action<DragSignal> sink)
     {
@@ -31,6 +32,9 @@ public sealed class MouseHookThread : IDisposable
     }
 
     public bool IsInstalled { get; private set; }
+
+    /// <summary>Environment.TickCount64 of the last mouse event the hook saw; a stale value means Windows dropped it.</summary>
+    public long LastEventTick => Volatile.Read(ref _lastEventTick);
 
     /// <summary>Win32 error code if installing the hook failed, otherwise 0.</summary>
     public int InstallError { get; private set; }
@@ -86,6 +90,7 @@ public sealed class MouseHookThread : IDisposable
     {
         if (code >= 0)
         {
+            Volatile.Write(ref _lastEventTick, Environment.TickCount64);
             var info = (MSLLHOOKSTRUCT*)lParam.Value;
             DragTransition transition = (uint)wParam.Value switch
             {

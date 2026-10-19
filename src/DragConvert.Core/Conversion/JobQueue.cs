@@ -9,10 +9,12 @@ public sealed class JobQueue : IDisposable
 {
     private readonly FormatCatalog _catalog;
     private readonly SemaphoreSlim _gate;
+    private readonly ITempTracker? _temps;
 
-    public JobQueue(FormatCatalog catalog, int? maxParallelism = null)
+    public JobQueue(FormatCatalog catalog, int? maxParallelism = null, ITempTracker? temps = null)
     {
         _catalog = catalog;
+        _temps = temps;
         MaxParallelism = Math.Max(1, maxParallelism ?? (Environment.ProcessorCount / 2));
         _gate = new SemaphoreSlim(MaxParallelism, MaxParallelism);
     }
@@ -53,6 +55,7 @@ public sealed class JobQueue : IDisposable
 
             string finalPath = OutputPaths.PlanFinal(inputPath, target, outputDirectory);
             tempPath = OutputPaths.TempFor(finalPath);
+            _temps?.Created(tempPath);
             var job = new ConversionJob(Path.GetFullPath(inputPath), tempPath, target, options ?? new Dictionary<string, string>());
 
             await provider.ConvertAsync(job, progress, cancellationToken).ConfigureAwait(false);
@@ -64,6 +67,7 @@ public sealed class JobQueue : IDisposable
             }
 
             finalPath = MoveIntoPlace(tempPath, inputPath, target, outputDirectory, finalPath);
+            _temps?.Finished(tempPath);
             tempPath = null;
             progress?.Report(1);
             return ConversionResult.Success(inputPath, target, finalPath);
@@ -90,6 +94,7 @@ public sealed class JobQueue : IDisposable
             if (tempPath is not null)
             {
                 TryDelete(tempPath);
+                _temps?.Finished(tempPath);
             }
 
             _gate.Release();

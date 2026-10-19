@@ -12,6 +12,12 @@ public static class ProcessRunner
 {
     private const int StderrTailLines = 40;
 
+    /// <summary>
+    /// Called right after each child process starts. The app uses it to put engines into a job object so they die with
+    /// the app; Providers itself stays free of Win32.
+    /// </summary>
+    public static Action<Process>? ProcessStarted { get; set; }
+
     public static async Task<ProcessResult> RunAsync(
         string executable,
         IEnumerable<string> arguments,
@@ -66,6 +72,7 @@ public static class ProcessRunner
             throw new InvalidOperationException($"Could not start {Path.GetFileName(executable)}.");
         }
 
+        ProcessStarted?.Invoke(process);
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
 

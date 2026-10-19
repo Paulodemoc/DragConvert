@@ -18,7 +18,8 @@ Providers.Windows holds providers/tools built on WinRT APIs (e.g. Windows.Data.P
 - Apps launched from an elevated shell are elevated, and Windows then blocks drops from Explorer: launch GUI test builds via tools/run-spike.cmd from Explorer.
 - Visual values (sizes, radii, colours, timings) belong in src/DragConvert.App/Theme/Tokens.xaml, not in code.
 - After UI changes, render snapshots and look at them before saying the UI is done; also run the --smoke check.
-- Rebuild BOTH Debug and Release before handing a build to the user (they often run the Debug exe).
+- Rebuild BOTH Debug and Release before handing a build to the user (they often run the Debug exe), then stop the running app and start the new Debug build non-elevated.
+- Never start forever-running WPF animations outside the state that shows them: they keep the render loop (and CPU) busy while hidden.
 - Hooks and overlay can't be unit tested: keep docs/test-matrix.md as the manual checklist the user runs on a real desktop.
 
 ## Commands
@@ -35,4 +36,4 @@ Providers.Windows holds providers/tools built on WinRT APIs (e.g. Windows.Data.P
 
 ## Current milestone
 See docs/design.md, Implementation plan. Work on one milestone at a time.
-Status: M4 done (tools: merge/split/pages-to-images/compress/combine-to-PDF/remove-metadata, Alt tiles; ADR 0006). Next: M5 hardening.
+Status: M5 done in code (hook supervisor/watchdog, job object, temp journal, log rotation, idle trim, DPI, high contrast; ADR 0007); manual M5 checks pending. Next: M6 packaging, signing, release.

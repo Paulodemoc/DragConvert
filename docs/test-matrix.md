@@ -105,3 +105,20 @@ Start with `tools\run-spike.cmd` (non-elevated). Notifications appear bottom-rig
 | P8 | Remove metadata on an MP3 with tags | "(clean).mp3" plays; title/artist gone | |
 | P9 | Password-protected PDF → Split pages | Notification says the PDF is password-protected | |
 | P10 | Tray window with a PDF | Tools section below formats; buttons work with Tab/Enter | |
+
+## M5: hardening
+
+| # | Check | Expected | Result |
+|---|---|---|---|
+| H1 | Start a fullscreen game or press F11 for a fullscreen video, wait 5 s | Log: "Mouse hook removed: fullscreen app in front"; back on the desktop: "Mouse hook installed" | |
+| H2 | Connect to this PC over Remote Desktop | Hook removed ("remote desktop session"); overlay doesn't appear | |
+| H3 | Tray menu → Pause drag overlay | Log "Mouse hook removed: paused"; overlay doesn't appear; unpausing reinstalls | |
+| H4 | Second monitor with different scaling (e.g. 100% + 150%) | Overlay appears centred on the cursor's monitor at the right size; glass backdrop lines up | |
+| H5 | Virtual desktops: switch desktop, drag with the trigger | Overlay appears on the current desktop | |
+| H6 | Switch Windows between light and dark | Ring style follows within a second or so (glass is neutral) | |
+| H7 | Turn on high contrast | Overlay switches to the ring with system colours | |
+| H8 | Turn off "Animation effects" in Settings → Accessibility | Overlay appears and disappears without animations | |
+| H9 | Kill DragConvert in Task Manager during a long video conversion | ffmpeg.exe disappears too; at next start the log says it removed the leftover temp file | |
+| H10 | Leave the app idle for a minute | Task Manager memory (working set) drops well below 50 MB; CPU stays at 0% | |
+| H11 | Narrator or Inspect over the tray window | Format and tool buttons are announced with names | |
+| H12 | Windows N edition (if available) | MP4 isn't offered; log: "H.264 encoding (h264_mf) unavailable" | |

@@ -6,18 +6,29 @@ namespace DragConvert.Core.Conversion;
 /// </summary>
 public sealed class FormatCatalog
 {
-    private readonly Dictionary<(MediaFormat Input, MediaFormat Target), IConversionProvider> _routes = [];
+    private readonly IReadOnlyList<IConversionProvider> _providers;
+    private Dictionary<(MediaFormat Input, MediaFormat Target), IConversionProvider> _routes = [];
 
     public FormatCatalog(IEnumerable<IConversionProvider> providers)
     {
-        foreach (IConversionProvider provider in providers.Where(p => p.IsAvailable))
+        _providers = providers.ToList();
+        Refresh();
+    }
+
+    /// <summary>Rebuilds the routes, e.g. after a provider found out at runtime that it can't produce a format.</summary>
+    public void Refresh()
+    {
+        var routes = new Dictionary<(MediaFormat Input, MediaFormat Target), IConversionProvider>();
+        foreach (IConversionProvider provider in _providers.Where(p => p.IsAvailable))
         {
             foreach (ConversionCapability capability in provider.Capabilities)
             {
                 // The first provider registered for a route wins, so registration order sets priority.
-                _routes.TryAdd((capability.Input, capability.Target), provider);
+                routes.TryAdd((capability.Input, capability.Target), provider);
             }
         }
+
+        _routes = routes;
     }
 
     /// <summary>Targets for one file, in <see cref="MediaFormats.All"/> order.</summary>

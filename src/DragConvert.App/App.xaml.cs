@@ -15,7 +15,9 @@ using DragConvert.Core.Conversion;
 using DragConvert.Core.Input;
 using DragConvert.Core.Instance;
 using DragConvert.Core.Settings;
+using DragConvert.Native.Platform;
 using DragConvert.Native.Shell;
+using DragConvert.Providers.Processes;
 using DragConvert.Native.Windowing;
 using DragConvert.Core.Tools;
 using DragConvert.Providers.Windows;
@@ -36,6 +38,9 @@ public partial class App : Application
     private OverlayController? _overlay;
     private PickerWindow? _picker;
     private SettingsWindow? _settingsWindow;
+    private ChildProcessJob? _childJob;
+    private DispatcherTimer? _idleTrim;
+    private long _lastTrimTick;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -100,11 +105,35 @@ public partial class App : Application
             }
         };
 
+        // Child processes (ffmpeg) die with the app, even if it crashes.
+        try
+        {
+            _childJob = new ChildProcessJob();
+            ProcessRunner.ProcessStarted = p => _childJob.Assign(p);
+        }
+        catch (InvalidOperationException ex)
+        {
+            Log.Warning(ex, "Job object unavailable; child processes won't be tied to the app");
+        }
+
+        // Temp outputs left behind by a crash are removed now.
+        var journal = new TempJournal(Path.Combine(AppPaths.DataFolder, "temp-journal.txt"));
+        int leftovers = journal.CleanUp();
+        if (leftovers > 0)
+        {
+            Log.Information("Removed {Count} temp file(s) left by a previous run", leftovers);
+        }
+
         string? ffmpeg = FfmpegLocator.Find();
         Log.Information("FFmpeg: {Path}", ffmpeg ?? "not found (audio and video conversions unavailable)");
-        var catalog = new FormatCatalog(AllProviders.Converters(ffmpeg));
+        IReadOnlyList<IConversionProvider> converters = AllProviders.Converters(ffmpeg);
+        var catalog = new FormatCatalog(converters);
         var tools = new ToolCatalog(AllProviders.Tools(ffmpeg));
-        _coordinator = new ConversionCoordinator(catalog, tools, _notifications, () => _settings, Dispatcher);
+        _coordinator = new ConversionCoordinator(catalog, tools, _notifications, () => _settings, Dispatcher, journal);
+        if (!options.Smoke)
+        {
+            _ = ProbeH264Async(converters, catalog);
+        }
         _picker = new PickerWindow(_coordinator);
 
         _trayIcon = (TaskbarIcon)FindResource("TrayIcon");
@@ -124,6 +153,29 @@ public partial class App : Application
 
         _overlay = new OverlayController(Dispatcher, renderer, _coordinator, ChordFor(_settings));
         _overlay.Start();
+
+        // Light/dark/high-contrast switches: rebuild the overlay with the new theme (debounced: Windows sends bursts).
+        var themeDebounce = new DispatcherTimer(TimeSpan.FromSeconds(1), DispatcherPriority.Background, (s, _) =>
+        {
+            ((DispatcherTimer)s!).Stop();
+            Log.Information("Windows theme changed; rebuilding the overlay");
+            _overlay?.Rebuild(options.Renderer ?? RendererFor(_settings));
+        }, Dispatcher);
+        themeDebounce.Stop();
+        Microsoft.Win32.SystemEvents.UserPreferenceChanged += (_, args) =>
+        {
+            if (args.Category is Microsoft.Win32.UserPreferenceCategory.General or Microsoft.Win32.UserPreferenceCategory.Color or Microsoft.Win32.UserPreferenceCategory.VisualStyle or Microsoft.Win32.UserPreferenceCategory.Accessibility)
+            {
+                Dispatcher.InvokeAsync(() =>
+                {
+                    themeDebounce.Stop();
+                    themeDebounce.Start();
+                });
+            }
+        };
+
+        // Idle memory: hand unused pages back to Windows when nothing is happening.
+        _idleTrim = new DispatcherTimer(TimeSpan.FromSeconds(20), DispatcherPriority.ApplicationIdle, (_, _) => TrimIfIdle(), Dispatcher);
 
         if (!options.Smoke)
         {
@@ -150,8 +202,10 @@ public partial class App : Application
         if (_instance is not null)
         {
             Log.Information("DragConvert exiting with code {Code}", e.ApplicationExitCode);
+            _idleTrim?.Stop();
             _overlay?.Dispose();
             _coordinator?.Dispose();
+            _childJob?.Dispose();
             _trayIcon?.Dispose();
             _instance.Dispose();
             Log.CloseAndFlush();
@@ -160,9 +214,50 @@ public partial class App : Application
         base.OnExit(e);
     }
 
-    /// <summary>The overlay style from settings; unknown values (such as the retired "dwm") fall back to Glass.</summary>
+    /// <summary>
+    /// The overlay style from settings; unknown values (such as the retired "dwm") fall back to Glass. High contrast
+    /// always uses the ring, whose palette switches to the system's high-contrast colours.
+    /// </summary>
     private static OverlayRenderer RendererFor(AppSettings settings) =>
-        Enum.TryParse(settings.Renderer, ignoreCase: true, out OverlayRenderer r) && Enum.IsDefined(r) ? r : OverlayRenderer.Glass;
+        SystemParameters.HighContrast ? OverlayRenderer.Layered
+        : Enum.TryParse(settings.Renderer, ignoreCase: true, out OverlayRenderer r) && Enum.IsDefined(r) ? r : OverlayRenderer.Glass;
+
+    /// <summary>On Windows "N" editions without Media Foundation, MP4 (h264_mf) can't encode: hide it.</summary>
+    private static async Task ProbeH264Async(IReadOnlyList<IConversionProvider> converters, FormatCatalog catalog)
+    {
+        if (converters.OfType<FfmpegProvider>().FirstOrDefault() is not { IsAvailable: true } ffmpeg)
+        {
+            return;
+        }
+
+        try
+        {
+            if (!await ffmpeg.ProbeH264Async())
+            {
+                catalog.Refresh();
+                Log.Warning("H.264 encoding (h264_mf) unavailable on this Windows; MP4 output hidden");
+            }
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or TimeoutException)
+        {
+            Log.Warning(ex, "H.264 probe failed");
+        }
+    }
+
+    private void TrimIfIdle()
+    {
+        if (_overlay?.IsActive == true || _coordinator?.IsBusy == true || Environment.TickCount64 - _lastTrimTick < 60_000)
+        {
+            return;
+        }
+
+        using var process = Process.GetCurrentProcess();
+        long before = process.WorkingSet64;
+        SessionState.TrimWorkingSet();
+        _lastTrimTick = Environment.TickCount64;
+        process.Refresh();
+        Log.Debug("Idle trim: working set {Before:F0} MB -> {After:F0} MB", before / 1048576.0, process.WorkingSet64 / 1048576.0);
+    }
 
     private static ModifierChord ChordFor(AppSettings settings) => ModifierChord.ForTrigger(settings.Trigger);
 
@@ -175,9 +270,20 @@ public partial class App : Application
     private static void ConfigureLogging(bool console)
     {
         const string template = "{Timestamp:HH:mm:ss.fff} [{Level:u3}] {SourceContext}: {Message:lj}{NewLine}{Exception}";
+        // Daily files, also rolled at 10 MB, 7 kept. Debug detail in Debug builds or with --console.
         var config = new LoggerConfiguration()
-            .MinimumLevel.Debug()
-            .WriteTo.File(Path.Combine(AppPaths.LogFolder, "dragconvert-.log"), rollingInterval: RollingInterval.Day, retainedFileCountLimit: 7, outputTemplate: template);
+            .WriteTo.File(
+                Path.Combine(AppPaths.LogFolder, "dragconvert-.log"),
+                rollingInterval: RollingInterval.Day,
+                fileSizeLimitBytes: 10 * 1024 * 1024,
+                rollOnFileSizeLimit: true,
+                retainedFileCountLimit: 7,
+                outputTemplate: template);
+#if DEBUG
+        config = config.MinimumLevel.Debug();
+#else
+        config = console ? config.MinimumLevel.Debug() : config.MinimumLevel.Information();
+#endif
         if (console)
         {
             config = config.WriteTo.Console(outputTemplate: template);

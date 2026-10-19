@@ -37,7 +37,32 @@ public sealed partial class FfmpegProvider : IConversionProvider
 
     public bool IsAvailable => _ffmpegPath is not null && File.Exists(_ffmpegPath);
 
-    public IReadOnlyCollection<ConversionCapability> Capabilities { get; }
+    public IReadOnlyCollection<ConversionCapability> Capabilities { get; private set; }
+
+    /// <summary>
+    /// Checks that h264_mf can actually encode (Windows "N" editions lack Media Foundation). When it can't, MP4 is
+    /// removed from the capabilities; call <see cref="FormatCatalog.Refresh"/> afterwards.
+    /// </summary>
+    public async Task<bool> ProbeH264Async(CancellationToken cancellationToken = default)
+    {
+        if (!IsAvailable)
+        {
+            return false;
+        }
+
+        ProcessResult result = await ProcessRunner.RunAsync(
+            _ffmpegPath!,
+            ["-hide_banner", "-nostdin", "-v", "error", "-f", "lavfi", "-i", "testsrc=size=64x64:rate=1:duration=1", "-frames:v", "1", "-pix_fmt", "nv12", "-c:v", "h264_mf", "-f", "null", "-"],
+            TimeSpan.FromSeconds(20),
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+        if (result.ExitCode != 0)
+        {
+            Capabilities = Capabilities.Where(c => c.Target != Mp4).ToArray();
+            return false;
+        }
+
+        return true;
+    }
 
     public async Task ConvertAsync(ConversionJob job, IProgress<double>? progress, CancellationToken cancellationToken)
     {

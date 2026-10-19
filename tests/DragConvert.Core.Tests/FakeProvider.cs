@@ -19,6 +19,8 @@ internal sealed class FakeProvider(string id, params ConversionCapability[] capa
 
     public TimeSpan Delay { get; init; }
 
+    public Action<ConversionJob>? OnConvert { get; init; }
+
     public List<ConversionJob> Jobs { get; } = [];
 
     public int MaxConcurrent { get; private set; }
@@ -34,6 +36,7 @@ internal sealed class FakeProvider(string id, params ConversionCapability[] capa
         try
         {
             progress?.Report(0.5);
+            OnConvert?.Invoke(job);
             if (Delay > TimeSpan.Zero)
             {
                 await Task.Delay(Delay, cancellationToken);
